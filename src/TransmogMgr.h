@@ -1,5 +1,5 @@
-#ifndef DEF_TRANSMOGRIFICATION_H
-#define DEF_TRANSMOGRIFICATION_H
+#ifndef MANGOS_TRANSMOG_MGR_H
+#define MANGOS_TRANSMOG_MGR_H
 
 #include "World/World.h"
 
@@ -15,7 +15,7 @@ struct ItemPrototype;
 
 enum TransmogAcoreStrings // Language.h might have same entries, appears when executing SQL, change if needed
 {
-    LANG_ERR_TRANSMOG_OK = 11100, // change this
+    LANG_ERR_TRANSMOG_OK = 11100,
     LANG_ERR_TRANSMOG_INVALID_SLOT,
     LANG_ERR_TRANSMOG_INVALID_SRC_ENTRY,
     LANG_ERR_TRANSMOG_MISSING_SRC_ITEM,
@@ -52,18 +52,23 @@ enum TransmogAcoreStrings // Language.h might have same entries, appears when ex
     LANG_MENU_OPTIONS,
 };
 
-class Transmogrification
+typedef std::unordered_map<ObjectGuid, uint32> transmog2Data;
+typedef std::unordered_map<ObjectGuid, transmog2Data> transmogMap;
+transmogMap entryMap; // entryMap[pGUID][iGUID] = entry
+
+typedef std::unordered_map<ObjectGuid, ObjectGuid> transmogData;
+transmogData dataMap; // dataMap[iGUID] = pGUID
+
+class TransmogMgr
 {
 public:
-    static Transmogrification* instance();
+    TransmogMgr() {}
 
-    typedef std::unordered_map<ObjectGuid, uint32> transmog2Data;
-    typedef std::unordered_map<ObjectGuid, transmog2Data> transmogMap;
-    transmogMap entryMap; // entryMap[pGUID][iGUID] = entry
+    void Init();
 
-    typedef std::unordered_map<ObjectGuid, ObjectGuid> transmogData;
-    transmogData dataMap; // dataMap[iGUID] = pGUID
+    // Player hooks
 
+/*
 #ifdef PRESETS
     bool EnableSetInfo;
     uint32 SetNpcText;
@@ -99,8 +104,7 @@ public:
     uint32 TransmogNpcAlreadyText;
     uint32 TransmogNpcAlreadyAltText;
 
-    // Use IsAllowed() and IsNotAllowed()
-    // these are thread unsafe, but assumed to be static data so it should be safe
+    /*
     std::set<uint32> Allowed;
     std::set<uint32> NotAllowed;
 
@@ -131,13 +135,15 @@ public:
     bool IgnoreReqLevel;
     bool IgnoreReqEvent;
     bool IgnoreReqStats;
+    */
 
+    /*
     bool IsAllowed(uint32 entry) const;
     bool IsNotAllowed(uint32 entry) const;
     bool IsAllowedQuality(uint32 quality) const;
     bool IsRangedWeapon(uint32 Class, uint32 SubClass) const;
 
-    void LoadConfig(bool reload); // thread unsafe
+    void LoadConfig(bool reload);
 
     std::string GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y) const;
     std::string GetSlotIcon(uint8 slot, uint32 width, uint32 height, int x, int y) const;
@@ -149,7 +155,7 @@ public:
     void DeleteFakeEntry(Player* player, uint8 slot, Item* itemTransmogrified);
     void SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified);
 
-    TransmogAcoreStrings Transmogrify(Player* player, ObjectGuid itemTransmogrifier, uint8 slot, /*uint32 newEntry, */bool no_cost = false);
+    TransmogAcoreStrings Transmogrify(Player* player, ObjectGuid itemTransmogrifier, uint8 slot, bool no_cost = false);
     bool CanTransmogrifyItemWithItem(Player* player, ItemPrototype const* target, ItemPrototype const* source) const;
     static bool SuitableForTransmogrification(Player* player, ItemPrototype const* proto);
     // bool CanBeTransmogrified(Item const* item);
@@ -183,7 +189,8 @@ public:
     uint32 GetSetNpcConfirmText() const;
     uint32 GetSetNpcAlreadyText() const;
     uint32 GetSetNpcAlreadyAltText() const;
+*/
 };
 
-#define sTransmogMgr Transmogrification::instance()
+#define sTransmogMgr MaNGOS::Singleton<TransmogMgr>::Instance()
 #endif

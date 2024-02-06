@@ -1,0 +1,11 @@
+###################################################################################################################
+# TRANSMOG SETTINGS
+#
+#    Transmog.Enable
+#        Enable Transmog system
+#        Default: 1 (enable - enables transmog system)
+#                 0 (disable - disables transmog system)
+#
+###################################################################################################################
+
+Transmog.Enable = 0

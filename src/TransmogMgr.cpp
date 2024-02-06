@@ -1,13 +1,15 @@
-#include "Transmogrification.h"
+#include "TransmogMgr.h"
+#include "TransmogConfig.h"
 
-Transmogrification* Transmogrification::instance()
+void TransmogMgr::Init()
 {
-	static Transmogrification instance;
-	return &instance;
+	sTransmogConfig.Initialize();
 }
 
+/*
 #ifdef PRESETS
-void Transmogrification::PresetTransmog(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot)
+
+void TransmogMgr::PresetTransmog(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot)
 {
 	if (!EnableSets)
 		return;
@@ -26,7 +28,7 @@ void Transmogrification::PresetTransmog(Player* player, Item* itemTransmogrified
 	itemTransmogrified->SetOwnerGuid(player->GetObjectGuid());
 }
 
-void Transmogrification::LoadPlayerSets(ObjectGuid pGUID)
+void TransmogMgr::LoadPlayerSets(ObjectGuid pGUID)
 {
 	for (presetData::iterator it = presetById[pGUID].begin(); it != presetById[pGUID].end(); ++it)
 		it->second.clear();
@@ -77,24 +79,24 @@ void Transmogrification::LoadPlayerSets(ObjectGuid pGUID)
 	}
 }
 
-bool Transmogrification::GetEnableSets() const
+bool TransmogMgr::GetEnableSets() const
 {
 	return EnableSets;
 }
-uint8 Transmogrification::GetMaxSets() const
+uint8 TransmogMgr::GetMaxSets() const
 {
 	return MaxSets;
 }
-float Transmogrification::GetSetCostModifier() const
+float TransmogMgr::GetSetCostModifier() const
 {
 	return SetCostModifier;
 }
-int32 Transmogrification::GetSetCopperCost() const
+int32 TransmogMgr::GetSetCopperCost() const
 {
 	return SetCopperCost;
 }
 
-void Transmogrification::UnloadPlayerSets(ObjectGuid pGUID)
+void TransmogMgr::UnloadPlayerSets(ObjectGuid pGUID)
 {
 	for (presetData::iterator it = presetById[pGUID].begin(); it != presetById[pGUID].end(); ++it)
 		it->second.clear();
@@ -104,7 +106,7 @@ void Transmogrification::UnloadPlayerSets(ObjectGuid pGUID)
 }
 #endif
 
-const char* Transmogrification::GetSlotName(uint8 slot, WorldSession* /*session*/) const
+const char* TransmogMgr::GetSlotName(uint8 slot, WorldSession*) const
 {
 	switch (slot)
 	{
@@ -126,7 +128,7 @@ const char* Transmogrification::GetSlotName(uint8 slot, WorldSession* /*session*
 	}
 }
 
-std::string Transmogrification::GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y) const
+std::string TransmogMgr::GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y) const
 {
 	std::ostringstream ss;
 	ss << "|TInterface";
@@ -146,7 +148,7 @@ std::string Transmogrification::GetItemIcon(uint32 entry, uint32 width, uint32 h
 	return ss.str();
 }
 
-std::string Transmogrification::GetSlotIcon(uint8 slot, uint32 width, uint32 height, int x, int y) const
+std::string TransmogMgr::GetSlotIcon(uint8 slot, uint32 width, uint32 height, int x, int y) const
 {
 	std::ostringstream ss;
 	ss << "|TInterface/PaperDoll/";
@@ -172,7 +174,7 @@ std::string Transmogrification::GetSlotIcon(uint8 slot, uint32 width, uint32 hei
 	return ss.str();
 }
 
-std::string Transmogrification::GetItemLink(Item* item, WorldSession* session) const
+std::string TransmogMgr::GetItemLink(Item* item, WorldSession* session) const
 {
 	int loc_idx = session->GetSessionDbLocaleIndex();
 	const ItemPrototype* temp = item->GetProto();
@@ -202,7 +204,7 @@ std::string Transmogrification::GetItemLink(Item* item, WorldSession* session) c
 				name += test;
 			}
 		}
-	}*/
+	}
 
 	std::ostringstream oss;
 	oss << "|c" << std::hex << ItemQualityColors[temp->Quality] << std::dec <<
@@ -218,7 +220,7 @@ std::string Transmogrification::GetItemLink(Item* item, WorldSession* session) c
 	return oss.str();
 }
 
-std::string Transmogrification::GetItemLink(uint32 entry, WorldSession* session) const
+std::string TransmogMgr::GetItemLink(uint32 entry, WorldSession* session) const
 {
 	const ItemPrototype* temp = sObjectMgr.GetItemPrototype(entry);
 	int loc_idx = session->GetSessionDbLocaleIndex();
@@ -230,7 +232,7 @@ std::string Transmogrification::GetItemLink(uint32 entry, WorldSession* session)
 	return oss.str();
 }
 
-uint32 Transmogrification::GetFakeEntry(const ObjectGuid itemGUID) const
+uint32 TransmogMgr::GetFakeEntry(const ObjectGuid itemGUID) const
 {
 	const auto itr = dataMap.find(itemGUID);
 	if (itr == dataMap.end()) return 0;
@@ -241,13 +243,13 @@ uint32 Transmogrification::GetFakeEntry(const ObjectGuid itemGUID) const
 	return itr3->second;
 }
 
-void Transmogrification::UpdateItem(Player* player, Item* item) const
+void TransmogMgr::UpdateItem(Player* player, Item* item) const
 {
 	if (item->IsEquipped())
 		player->SetVisibleItemSlot(item->GetSlot(), item);
 }
 
-void Transmogrification::DeleteFakeEntry(Player* player, uint8 /*slot*/, Item* itemTransmogrified)
+void TransmogMgr::DeleteFakeEntry(Player* player, uint8, Item* itemTransmogrified)
 {
 	//if (!GetFakeEntry(item))
 	//    return false;
@@ -255,7 +257,7 @@ void Transmogrification::DeleteFakeEntry(Player* player, uint8 /*slot*/, Item* i
 	UpdateItem(player, itemTransmogrified);
 }
 
-void Transmogrification::SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified)
+void TransmogMgr::SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified)
 {
 	const ObjectGuid itemGUID = itemTransmogrified->GetObjectGuid();
 	entryMap[player->GetObjectGuid()][itemGUID] = newEntry;
@@ -264,7 +266,7 @@ void Transmogrification::SetFakeEntry(Player* player, uint32 newEntry, Item* ite
 	UpdateItem(player, itemTransmogrified);
 }
 
-TransmogAcoreStrings Transmogrification::Transmogrify(Player* player, ObjectGuid TransmogrifierGUID, uint8 slot, /*uint32 newEntry, */bool no_cost)
+TransmogAcoreStrings TransmogMgr::Transmogrify(Player* player, ObjectGuid TransmogrifierGUID, uint8 slot, bool no_cost)
 {
 	if (slot >= EQUIPMENT_SLOT_END)
 	{
@@ -338,7 +340,7 @@ TransmogAcoreStrings Transmogrification::Transmogrify(Player* player, ObjectGuid
 	return LANG_ERR_TRANSMOG_OK;
 }
 
-bool Transmogrification::CanTransmogrifyItemWithItem(Player* player, ItemPrototype const* target, ItemPrototype const* source) const
+bool TransmogMgr::CanTransmogrifyItemWithItem(Player* player, ItemPrototype const* target, ItemPrototype const* source) const
 {
 	if (!target || !source)
 		return false;
@@ -391,7 +393,7 @@ bool Transmogrification::CanTransmogrifyItemWithItem(Player* player, ItemPrototy
 	return true;
 }
 
-bool Transmogrification::SuitableForTransmogrification(Player* player, ItemPrototype const* proto)
+bool TransmogMgr::SuitableForTransmogrification(Player* player, ItemPrototype const* proto)
 {
 	if (!player || !proto)
 		return false;
@@ -425,13 +427,13 @@ bool Transmogrification::SuitableForTransmogrification(Player* player, ItemProto
 	return true;
 }
 
-uint32 Transmogrification::GetSpecialPrice(ItemPrototype const* proto) const
+uint32 TransmogMgr::GetSpecialPrice(ItemPrototype const* proto) const
 {
 	uint32 cost = proto->SellPrice ? proto->SellPrice : 100;
 	return cost;
 }
 
-std::string Transmogrification::FormatPrice(uint32 copper) const
+std::string TransmogMgr::FormatPrice(uint32 copper) const
 {
 	std::ostringstream out;
 	if (!copper)
@@ -468,7 +470,7 @@ std::string Transmogrification::FormatPrice(uint32 copper) const
 	return out.str();
 }
 
-bool Transmogrification::IsRangedWeapon(uint32 Class, uint32 SubClass) const
+bool TransmogMgr::IsRangedWeapon(uint32 Class, uint32 SubClass) const
 {
 	return Class == ITEM_CLASS_WEAPON && (
 		SubClass == ITEM_SUBCLASS_WEAPON_BOW ||
@@ -476,17 +478,18 @@ bool Transmogrification::IsRangedWeapon(uint32 Class, uint32 SubClass) const
 		SubClass == ITEM_SUBCLASS_WEAPON_CROSSBOW);
 }
 
-bool Transmogrification::IsAllowed(uint32 entry) const
+/*
+bool TransmogMgr::IsAllowed(uint32 entry) const
 {
 	return Allowed.find(entry) != Allowed.end();
 }
 
-bool Transmogrification::IsNotAllowed(uint32 entry) const
+bool TransmogMgr::IsNotAllowed(uint32 entry) const
 {
 	return NotAllowed.find(entry) != NotAllowed.end();
 }
 
-bool Transmogrification::IsAllowedQuality(uint32 quality) const
+bool TransmogMgr::IsAllowedQuality(uint32 quality) const
 {
 	switch (quality)
 	{
@@ -501,7 +504,7 @@ bool Transmogrification::IsAllowedQuality(uint32 quality) const
 	}
 }
 
-void Transmogrification::LoadConfig(bool reload)
+void TransmogMgr::LoadConfig(bool reload)
 {
 #ifdef PRESETS
 	EnableSetInfo = true;
@@ -590,7 +593,7 @@ void Transmogrification::LoadConfig(bool reload)
 	}
 }
 
-void Transmogrification::DeleteFakeFromDB(const ObjectGuid itemLowGuid)
+void TransmogMgr::DeleteFakeFromDB(const ObjectGuid itemLowGuid)
 {
 	const ObjectGuid itemGUID = itemLowGuid;
 
@@ -604,7 +607,7 @@ void Transmogrification::DeleteFakeFromDB(const ObjectGuid itemLowGuid)
 	CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE GUID = %u", itemLowGuid.GetCounter());
 }
 
-void Transmogrification::CleanUp(Player* pPlayer)
+void TransmogMgr::CleanUp(Player* pPlayer)
 {
 	auto result = CharacterDatabase.PQuery("SELECT GUID, FakeEntry FROM custom_transmogrification WHERE Owner = %u", pPlayer->GetObjectGuid());
 	if (result)
@@ -618,7 +621,7 @@ void Transmogrification::CleanUp(Player* pPlayer)
 	}
 }
 
-void Transmogrification::BuildTransmogMap(Player* pPlayer)
+void TransmogMgr::BuildTransmogMap(Player* pPlayer)
 {
 	const ObjectGuid playerGUID = pPlayer->GetObjectGuid();
 	entryMap.erase(playerGUID);
@@ -638,7 +641,7 @@ void Transmogrification::BuildTransmogMap(Player* pPlayer)
 	}
 }
 
-bool Transmogrification::Refresh(Player* pPlayer, Item* pEquippedItem)
+bool TransmogMgr::Refresh(Player* pPlayer, Item* pEquippedItem)
 {
 	//if (!pPlayer || !pEquippedItem)
 	//	return false;
@@ -677,7 +680,7 @@ bool Transmogrification::Refresh(Player* pPlayer, Item* pEquippedItem)
 	return ok;
 }
 
-bool Transmogrification::RevertAll(Player* pPlayer)
+bool TransmogMgr::RevertAll(Player* pPlayer)
 {
 	if (!pPlayer)
 		return false;
@@ -721,7 +724,7 @@ bool Transmogrification::RevertAll(Player* pPlayer)
 	return ok;
 }
 
-bool Transmogrification::ApplyAll(Player* pPlayer)
+bool TransmogMgr::ApplyAll(Player* pPlayer)
 {
 	//if (!pPlayer)
 	//	return false;
@@ -764,7 +767,7 @@ bool Transmogrification::ApplyAll(Player* pPlayer)
 	return ok;
 }
 
-void Transmogrification::OnLogout(Player* player)
+void TransmogMgr::OnLogout(Player* player)
 {
 	if (!player)
 		return;
@@ -775,63 +778,64 @@ void Transmogrification::OnLogout(Player* player)
 	entryMap.erase(pGUID);
 }
 
-bool Transmogrification::GetEnableTransmogInfo() const
+bool TransmogMgr::GetEnableTransmogInfo() const
 {
 	return EnableTransmogInfo;
 }
-uint32 Transmogrification::GetTransmogNpcText() const
+uint32 TransmogMgr::GetTransmogNpcText() const
 {
 	return TransmogNpcText;
 }
-uint32 Transmogrification::GetNpcSelectLookText() const
+uint32 TransmogMgr::GetNpcSelectLookText() const
 {
 	return TransmogNpcSelectLookText;
 }
-uint32 Transmogrification::GetSetNpcConfirmText() const
+uint32 TransmogMgr::GetSetNpcConfirmText() const
 {
 	return TransmogNpcConfirmText;
 }
-uint32 Transmogrification::GetSetNpcAlreadyText() const
+uint32 TransmogMgr::GetSetNpcAlreadyText() const
 {
 	return TransmogNpcAlreadyText;
 }
-uint32 Transmogrification::GetSetNpcAlreadyAltText() const
+uint32 TransmogMgr::GetSetNpcAlreadyAltText() const
 {
 	return TransmogNpcAlreadyAltText;
 }
-bool Transmogrification::GetEnableSetInfo() const
+bool TransmogMgr::GetEnableSetInfo() const
 {
 	return EnableSetInfo;
 }
-uint32 Transmogrification::GetSetNpcText() const
+uint32 TransmogMgr::GetSetNpcText() const
 {
 	return SetNpcText;
 }
-float Transmogrification::GetScaledCostModifier() const
+float TransmogMgr::GetScaledCostModifier() const
 {
 	return ScaledCostModifier;
 }
-int32 Transmogrification::GetCopperCost() const
+int32 TransmogMgr::GetCopperCost() const
 {
 	return CopperCost;
 }
-bool Transmogrification::GetRequireToken() const
+bool TransmogMgr::GetRequireToken() const
 {
 	return RequireToken;
 }
-uint32 Transmogrification::GetTokenEntry() const
+uint32 TransmogMgr::GetTokenEntry() const
 {
 	return TokenEntry;
 }
-uint32 Transmogrification::GetTokenAmount() const
+uint32 TransmogMgr::GetTokenAmount() const
 {
 	return TokenAmount;
 }
-bool Transmogrification::GetAllowMixedArmorTypes() const
+bool TransmogMgr::GetAllowMixedArmorTypes() const
 {
 	return AllowMixedArmorTypes;
 };
-bool Transmogrification::GetAllowMixedWeaponTypes() const
+bool TransmogMgr::GetAllowMixedWeaponTypes() const
 {
 	return AllowMixedWeaponTypes;
 };
+*/

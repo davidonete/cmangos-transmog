@@ -1,25 +1,5 @@
-// TRANSMOG MOD
-// https://github.com/cmangos/mangos-classic/commit/584549c36e3907ca8f3d18b8cca58ddc5b6ae0ea#diff-b2885fa5fd324ea8cee60d30c05d24ba695ba6a296bba8f60e31040c10176977
+#include "TransmogMgr.h"
 
-/*
-5.0
-Transmogrification 3.3.5a - Gossip menu
-By Rochet2
-ScriptName for NPC:
-Creature_Transmogrify
-TODO:
-Make DB saving even better (Deleting)? What about coding?
-Fix the cost formula
--- Too much data handling, use default costs
-Are the qualities right?
-Blizzard might have changed the quality requirements.
-(TC handles it with stat checks)
-Cant transmogrify rediculus items // Foereaper: would be fun to stab people with a fish
--- Cant think of any good way to handle this easily, could rip flagged items from cata DB
-*/
-
-#include "Bag.h"
-#include "Transmogrification.h"
 #define sTransmogrifier  sTransmogrification
 #define GTS session->GetAcoreString // dropped translation support, no one using?
 
@@ -165,7 +145,7 @@ bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 ac
         }
         if (sTransmogrifier->GetEnableSetInfo())
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "How do sets work?", EQUIPMENT_SLOT_END + 10, 0);
-        for (Transmogrification::presetIdMap::const_iterator it = sTransmogrifier->presetByName[player->GetObjectGuid()].begin(); it != sTransmogrifier->presetByName[player->GetObjectGuid()].end(); ++it)
+        for (TransmogMgr::presetIdMap::const_iterator it = sTransmogrifier->presetByName[player->GetObjectGuid()].begin(); it != sTransmogrifier->presetByName[player->GetObjectGuid()].end(); ++it)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zz?" /*it->second*/, EQUIPMENT_SLOT_END + 6, it->first);
 
         if (sTransmogrifier->presetByName[player->GetObjectGuid()].size() < sTransmogrifier->GetMaxSets())
@@ -181,7 +161,7 @@ bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 ac
             return true;
         }
         // action = presetID
-        for (Transmogrification::slotMap::const_iterator it = sTransmogrifier->presetById[player->GetObjectGuid()][action].begin(); it != sTransmogrifier->presetById[player->GetObjectGuid()][action].end(); ++it)
+        for (TransmogMgr::slotMap::const_iterator it = sTransmogrifier->presetById[player->GetObjectGuid()][action].begin(); it != sTransmogrifier->presetById[player->GetObjectGuid()][action].end(); ++it)
         {
             if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, it->first))
                 sTransmogrifier->PresetTransmog(player, item, it->second, it->first);
@@ -196,7 +176,7 @@ bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 ac
             return true;
         }
         // action = presetID
-        for (Transmogrification::slotMap::const_iterator it = sTransmogrifier->presetById[player->GetObjectGuid()][action].begin(); it != sTransmogrifier->presetById[player->GetObjectGuid()][action].end(); ++it)
+        for (TransmogMgr::slotMap::const_iterator it = sTransmogrifier->presetById[player->GetObjectGuid()][action].begin(); it != sTransmogrifier->presetById[player->GetObjectGuid()][action].end(); ++it)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zzz"/*sTransmogrifier->GetItemIcon(it->second, 30, 30, -18, 0) + sTransmogrifier->GetItemLink(it->second, session)*/, sender, action);
 
         player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_MONEY_BAG, "Use this set", EQUIPMENT_SLOT_END + 5, action, "Using this set for transmogrify will bind transmogrified items to you and make them non-refundable and non-tradeable.\nDo you wish to continue?\n\n" + sTransmogrifier->presetByName[player->GetObjectGuid()][action], 0, false);
