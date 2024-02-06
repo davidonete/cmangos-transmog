@@ -1,6 +1,3 @@
-// TRANSMOG MOD
-// https://github.com/cmangos/mangos-classic/commit/584549c36e3907ca8f3d18b8cca58ddc5b6ae0ea#diff-711f6fb9db06d748b096586807a95c6c5f89d80fcc811b9b9c660bef3a602e28
-
 #ifndef DEF_TRANSMOGRIFICATION_H
 #define DEF_TRANSMOGRIFICATION_H
 
@@ -187,6 +184,6 @@ public:
     uint32 GetSetNpcAlreadyText() const;
     uint32 GetSetNpcAlreadyAltText() const;
 };
-#define sTransmogrification Transmogrification::instance()
 
+#define sTransmogMgr Transmogrification::instance()
 #endif

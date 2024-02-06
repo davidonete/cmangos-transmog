@@ -2,14 +2,14 @@
 
 #include "Config/Config.h"
 
-class HardcoreConfig
+class TransmogConfig
 {
 public:
-    HardcoreConfig();
+    TransmogConfig();
 
-    static HardcoreConfig& instance()
+    static TransmogConfig& instance()
     {
-        static HardcoreConfig instance;
+        static TransmogConfig instance;
         return instance;
     }
 
@@ -17,26 +17,10 @@ public:
 
 public:
     bool enabled;
-    bool spawnGrave;
-    uint32 graveGameObjectId;
-    std::string graveMessage;
-    float dropGearPct;
-    float dropItemsPct;
-    float dropMoneyPct;
-#ifdef ENABLE_MANGOSBOTS
-    float botDropGearPct;
-    float botDropItemsPct;
-    float botDropMoneyPct;
-#endif
-    uint32 lootGameObjectId;
-    bool reviveDisabled;
-    bool reviveOnGraveyard;
-    float levelDownPct;
-    uint32 maxDroppedLoot;
 
 private:
     Config config;
 };
 
-#define sHardcoreConfig MaNGOS::Singleton<HardcoreConfig>::Instance()
+#define sTransmogConfig MaNGOS::Singleton<TransmogConfig>::Instance()
 

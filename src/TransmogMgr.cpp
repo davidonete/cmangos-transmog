@@ -1,6 +1,3 @@
-// TRANSMOG MOD
-// https://github.com/cmangos/mangos-classic/commit/584549c36e3907ca8f3d18b8cca58ddc5b6ae0ea#diff-1a6b4435d6495bab441de7d36b4c0c2540068da269dcaa890bf511b0a6118d26
-
 #include "Transmogrification.h"
 
 Transmogrification* Transmogrification::instance()
@@ -303,7 +300,7 @@ TransmogAcoreStrings Transmogrification::Transmogrify(Player* player, ObjectGuid
 		if (!CanTransmogrifyItemWithItem(player, itemTransmogrified->GetProto(), itemTransmogrifier->GetProto()))
 			return LANG_ERR_TRANSMOG_INVALID_ITEMS;
 
-		if (sTransmogrification->GetFakeEntry(itemTransmogrified->GetObjectGuid()) == itemTransmogrifier->GetEntry())
+		if (sTransmogMgr->GetFakeEntry(itemTransmogrified->GetObjectGuid()) == itemTransmogrifier->GetEntry())
 			return LANG_ERR_TRANSMOG_SAME_DISPLAYID;
 
 		if (!no_cost)

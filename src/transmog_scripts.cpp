@@ -494,7 +494,7 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
             Items[PlayerGUID].clear();
             for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; i++)
                 if (Item* pItemTransmogrifier = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                    if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogrification->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+                    if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogMgr->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
                         if (Items[PlayerGUID].find(pItemTransmogrifier->GetProto()->DisplayInfoID) == Items[PlayerGUID].end())
                         {
                             Items[PlayerGUID][pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
@@ -505,7 +505,7 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
                 if (const auto pBag = dynamic_cast<Bag*>(pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
                     for (uint32 j = 0; j < pBag->GetBagSize(); j++)
                         if (Item* pItemTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
-                            if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogrification->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+                            if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogMgr->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
                                 if (Items[PlayerGUID].find(pItemTransmogrifier->GetProto()->DisplayInfoID) == Items[PlayerGUID].end())
                                 {
                                     Items[PlayerGUID][pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
@@ -514,7 +514,7 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
 
             for (uint8 i = BANK_SLOT_ITEM_START; i < BANK_SLOT_ITEM_END; i++)
                 if (Item* pItemTransmogrifier = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                    if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogrification->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+                    if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogMgr->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
                         if (Items[PlayerGUID].find(pItemTransmogrifier->GetProto()->DisplayInfoID) == Items[PlayerGUID].end())
                         {
                             Items[PlayerGUID][pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
@@ -525,7 +525,7 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
                 if (const auto pBag = dynamic_cast<Bag*>(pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
                     for (uint32 j = 0; j < pBag->GetBagSize(); j++)
                         if (Item* pItemTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
-                            if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogrification->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+                            if (sTransmogrifier->CanTransmogrifyItemWithItem(pPlayer, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && sTransmogMgr->GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
                                 if (Items[PlayerGUID].find(pItemTransmogrifier->GetProto()->DisplayInfoID) == Items[PlayerGUID].end())
                                 {
                                     Items[PlayerGUID][pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
@@ -535,7 +535,7 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
             // Remove the transmogrifier on the current item
             bool hasTransmogOptions = !Items[PlayerGUID].empty();
             bool hasTransmog = false;
-            if (const uint32 FakeEntry = sTransmogrification->GetFakeEntry(EquippedItemGUID))
+            if (const uint32 FakeEntry = sTransmogMgr->GetFakeEntry(EquippedItemGUID))
             {
                 hasTransmog = true;
                 if (ItemPrototype const* pItem = sObjectMgr.GetItemPrototype(FakeEntry))
@@ -579,10 +579,10 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
             if (Item* pEquippedItem = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, Slot))
             {
                 ObjectGuid EquippedItemGUID = pEquippedItem->GetObjectGuid();
-                if (!sTransmogrification->GetFakeEntry(EquippedItemGUID))
+                if (!sTransmogMgr->GetFakeEntry(EquippedItemGUID))
                     continue;
 
-                sTransmogrification->DeleteFakeEntry(pPlayer, Slot, pEquippedItem);
+                sTransmogMgr->DeleteFakeEntry(pPlayer, Slot, pEquippedItem);
                 removed = true;
             }
         }
@@ -607,9 +607,9 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
         if (Item* pEquippedItem = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, static_cast<uint8>(aSlot)))
         {
             const ObjectGuid EquippedItemGUID = pEquippedItem->GetObjectGuid();
-            if (sTransmogrification->GetFakeEntry(EquippedItemGUID))
+            if (sTransmogMgr->GetFakeEntry(EquippedItemGUID))
             {
-                sTransmogrification->DeleteFakeEntry(pPlayer, static_cast<uint8>(aSlot), pEquippedItem);
+                sTransmogMgr->DeleteFakeEntry(pPlayer, static_cast<uint8>(aSlot), pEquippedItem);
                 removed = true;
             }
         }
@@ -631,7 +631,7 @@ bool GossipSelect_TransmogNPC(Player* pPlayer, Creature* pUnit, const uint32 sen
     // Update all transmogrifications
     else if (sender == EQUIPMENT_SLOT_END + 4)
     {
-        sTransmogrification->ApplyAll(pPlayer);
+        sTransmogMgr->ApplyAll(pPlayer);
         pPlayer->GetSession()->SendAreaTriggerMessage("Your appearance was refreshed");
         GossipHello_TransmogNPC(pPlayer, pUnit);
     }
