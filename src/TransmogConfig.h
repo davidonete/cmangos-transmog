@@ -17,6 +17,7 @@ public:
 
 public:
     bool enabled;
+    bool presetsEnabled;
 
 private:
     Config config;

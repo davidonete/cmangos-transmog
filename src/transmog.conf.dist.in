@@ -6,6 +6,12 @@
 #        Default: 1 (enable - enables transmog system)
 #                 0 (disable - disables transmog system)
 #
+#    Transmog.Presets
+#        Enable saving transmog presets
+#        Default: 1 (enabled)
+#                 0 (disabled)
+#
 ###################################################################################################################
 
 Transmog.Enable = 0
+Transmog.Presets = 1

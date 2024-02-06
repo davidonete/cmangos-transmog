@@ -1,5 +1,6 @@
 #include "TransmogMgr.h"
 
+/*
 #define sTransmogrifier  sTransmogrification
 #define GTS session->GetAcoreString // dropped translation support, no one using?
 
@@ -146,7 +147,7 @@ bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 ac
         if (sTransmogrifier->GetEnableSetInfo())
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "How do sets work?", EQUIPMENT_SLOT_END + 10, 0);
         for (TransmogMgr::presetIdMap::const_iterator it = sTransmogrifier->presetByName[player->GetObjectGuid()].begin(); it != sTransmogrifier->presetByName[player->GetObjectGuid()].end(); ++it)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zz?" /*it->second*/, EQUIPMENT_SLOT_END + 6, it->first);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zz?", EQUIPMENT_SLOT_END + 6, it->first);
 
         if (sTransmogrifier->presetByName[player->GetObjectGuid()].size() < sTransmogrifier->GetMaxSets())
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "Save set", EQUIPMENT_SLOT_END + 8, 0);
@@ -177,7 +178,7 @@ bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 ac
         }
         // action = presetID
         for (TransmogMgr::slotMap::const_iterator it = sTransmogrifier->presetById[player->GetObjectGuid()][action].begin(); it != sTransmogrifier->presetById[player->GetObjectGuid()][action].end(); ++it)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zzz"/*sTransmogrifier->GetItemIcon(it->second, 30, 30, -18, 0) + sTransmogrifier->GetItemLink(it->second, session)*/, sender, action);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zzz", sender, action);
 
         player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_MONEY_BAG, "Use this set", EQUIPMENT_SLOT_END + 5, action, "Using this set for transmogrify will bind transmogrified items to you and make them non-refundable and non-tradeable.\nDo you wish to continue?\n\n" + sTransmogrifier->presetByName[player->GetObjectGuid()][action], 0, false);
         player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_MONEY_BAG, "Delete set", EQUIPMENT_SLOT_END + 7, action, "Are you sure you want to delete " + sTransmogrifier->presetByName[player->GetObjectGuid()][action] + "?", 0, false);
@@ -224,7 +225,7 @@ bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 ac
                     continue;
                 cost += sTransmogrifier->GetSpecialPrice(temp);
                 canSave = true;
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zzzu"/*sTransmogrifier->GetItemIcon(entry, 30, 30, -18, 0) + sTransmogrifier->GetItemLink(entry, session)*/, EQUIPMENT_SLOT_END + 8, 0);
+                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_MONEY_BAG, "zzzu", EQUIPMENT_SLOT_END + 8, 0);
             }
         }
         if (canSave)
@@ -707,3 +708,4 @@ void AddSC_Transmog()
     newscript->pGossipSelect = &GossipSelect_TransmogNPC;
     newscript->RegisterSelf(false);
 }
+*/

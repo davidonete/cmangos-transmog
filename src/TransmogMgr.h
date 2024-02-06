@@ -5,15 +5,16 @@
 
 #include <unordered_map>
 
-#define PRESETS // comment this line to disable preset feature totally
-#define MAX_OPTIONS 25 // do not alter
+//#define PRESETS // comment this line to disable preset feature totally
+//#define MAX_OPTIONS 25 // do not alter
 
-class Item;
 class Player;
-class WorldSession;
-struct ItemPrototype;
 
-enum TransmogAcoreStrings // Language.h might have same entries, appears when executing SQL, change if needed
+//class Item;
+//class WorldSession;
+//struct ItemPrototype;
+
+enum TransmogAcoreStrings
 {
     LANG_ERR_TRANSMOG_OK = 11100,
     LANG_ERR_TRANSMOG_INVALID_SLOT,
@@ -30,10 +31,7 @@ enum TransmogAcoreStrings // Language.h might have same entries, appears when ex
     LANG_ERR_UNTRANSMOG_NO_TRANSMOGS,
     LANG_ERR_UNTRANSMOG_SINGLE_NO_TRANSMOGS,
 
-
-#ifdef PRESETS
     LANG_PRESET_ERR_INVALID_NAME,
-#endif
     LANG_CMD_TRANSMOG_SHOW,
     LANG_CMD_TRANSMOG_HIDE,
     LANG_CMD_TRANSMOG_ADD_UNSUITABLE,
@@ -52,12 +50,15 @@ enum TransmogAcoreStrings // Language.h might have same entries, appears when ex
     LANG_MENU_OPTIONS,
 };
 
-typedef std::unordered_map<ObjectGuid, uint32> transmog2Data;
-typedef std::unordered_map<ObjectGuid, transmog2Data> transmogMap;
-transmogMap entryMap; // entryMap[pGUID][iGUID] = entry
+typedef std::unordered_map<ObjectGuid, uint32> Transmog2Data;
+typedef std::unordered_map<ObjectGuid, Transmog2Data> TransmogMap;
+typedef std::unordered_map<ObjectGuid, ObjectGuid> TransmogData;
 
-typedef std::unordered_map<ObjectGuid, ObjectGuid> transmogData;
-transmogData dataMap; // dataMap[iGUID] = pGUID
+typedef std::map<uint8, uint32> SlotMap;
+typedef std::map<uint8, SlotMap> PresetData;
+typedef std::map<uint8, std::string> PresetIdMap;
+typedef std::unordered_map<ObjectGuid, PresetData> PresetDataMap;
+typedef std::unordered_map<ObjectGuid, PresetIdMap> PresetNameMap;
 
 class TransmogMgr
 {
@@ -67,19 +68,30 @@ public:
     void Init();
 
     // Player hooks
+    void OnPlayerLogout(Player* player);
+
+private:
+    void UnloadPlayerPresets(const ObjectGuid& playerID);
+
+private:
+    TransmogMap entryMap;
+    TransmogData dataMap;
+
+    // Presets
+    PresetDataMap presetById;
+    PresetNameMap presetByName;
 
 /*
 #ifdef PRESETS
     bool EnableSetInfo;
     uint32 SetNpcText;
 
-    typedef std::map<uint8, uint32> slotMap;
-    typedef std::map<uint8, slotMap> presetData;
-    typedef std::unordered_map<ObjectGuid, presetData> presetDataMap;
-    presetDataMap presetById; // presetById[pGUID][presetID][slot] = entry
-    typedef std::map<uint8, std::string> presetIdMap;
-    typedef std::unordered_map<ObjectGuid, presetIdMap> presetNameMap;
-    presetNameMap presetByName; // presetByName[pGUID][presetID] = presetName
+
+    
+    
+
+    
+    
 
     void PresetTransmog(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot);
 

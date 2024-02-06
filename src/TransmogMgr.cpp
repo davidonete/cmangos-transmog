@@ -1,9 +1,44 @@
 #include "TransmogMgr.h"
 #include "TransmogConfig.h"
 
+#include "Entities/Player.h"
+
 void TransmogMgr::Init()
 {
 	sTransmogConfig.Initialize();
+}
+
+void TransmogMgr::OnPlayerLogout(Player* player)
+{
+	if (sTransmogConfig.enabled)
+	{
+        if (player)
+        {
+            const ObjectGuid playerID = player->GetObjectGuid();
+            for (auto it = entryMap[playerID].begin(); it != entryMap[playerID].end(); ++it)
+            {
+                dataMap.erase(it->first);
+            }
+
+            entryMap.erase(playerID);
+
+            if (sTransmogConfig.presetsEnabled)
+            {
+				UnloadPlayerPresets(playerID);
+            }
+        }
+	}
+}
+
+void TransmogMgr::UnloadPlayerPresets(const ObjectGuid& playerID)
+{
+    for (auto it = presetById[playerID].begin(); it != presetById[playerID].end(); ++it)
+	{
+        it->second.clear();
+	}
+
+    presetById[playerID].clear();
+    presetByName[playerID].clear();
 }
 
 /*

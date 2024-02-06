@@ -5,8 +5,9 @@
 
 TransmogConfig::TransmogConfig()
 : enabled(false)
+, presetsEnabled(false)
 {
-
+    
 }
 
 INSTANTIATE_SINGLETON_1(TransmogConfig);
@@ -22,6 +23,7 @@ bool TransmogConfig::Initialize()
     }
 
     enabled = config.GetBoolDefault("Transmog.Enable", false);
+    presetsEnabled = config.GetBoolDefault("Transmog.Presets", false);
 
     sLog.outString("Transmog configuration loaded");
     return true;
