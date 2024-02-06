@@ -6,6 +6,8 @@
 TransmogConfig::TransmogConfig()
 : enabled(false)
 , presetsEnabled(false)
+, costMultiplier(1.0f)
+, costFee(0U)
 {
     
 }
@@ -24,6 +26,8 @@ bool TransmogConfig::Initialize()
 
     enabled = config.GetBoolDefault("Transmog.Enable", false);
     presetsEnabled = config.GetBoolDefault("Transmog.Presets", false);
+    costMultiplier = config.GetFloatDefault("Transmog.CostMultiplier", 1.0f);
+    costFee = config.GetIntDefault("Transmog.CostFee", 0U);
 
     sLog.outString("Transmog configuration loaded");
     return true;

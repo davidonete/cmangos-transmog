@@ -7,11 +7,23 @@
 #                 0 (disable - disables transmog system)
 #
 #    Transmog.Presets
-#        Enable saving transmog presets
+#        Allow saving transmog presets
 #        Default: 1 (enabled)
 #                 0 (disabled)
+#
+#    Transmog.CostFee
+#        How much (in copper) should the player pay extra per transmog item
+#		 The total price is (sell price + cost fee) * cost multiplier
+#        Default: 0
+#
+#    Transmog.CostMultiplier
+#        The multiplier price to pay per transmog item
+#		 The total price is (sell price + cost fee) * cost multiplier
+#        Default: 1.0
 #
 ###################################################################################################################
 
 Transmog.Enable = 0
 Transmog.Presets = 1
+Transmog.CostFee = 0
+Transmog.CostMultiplier = 1.0

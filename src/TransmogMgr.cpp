@@ -1,6 +1,7 @@
 #include "TransmogMgr.h"
 #include "TransmogConfig.h"
 
+#include "Entities/GossipDef.h"
 #include "Entities/Player.h"
 #include "Globals/ObjectMgr.h"
 
@@ -46,6 +47,183 @@ void TransmogMgr::OnPlayerLogout(Player* player)
             }
         }
 	}
+}
+
+const char* GetSlotName(uint8 slot)
+{
+    switch (slot)
+    {
+		case EQUIPMENT_SLOT_HEAD: return "Head";
+		case EQUIPMENT_SLOT_SHOULDERS: return "Shoulders";
+		case EQUIPMENT_SLOT_BODY: return "Shirt";
+		case EQUIPMENT_SLOT_CHEST: return "Chest";
+		case EQUIPMENT_SLOT_WAIST: return "Waist";
+		case EQUIPMENT_SLOT_LEGS: return "Legs";
+		case EQUIPMENT_SLOT_FEET: return "Feet";
+		case EQUIPMENT_SLOT_WRISTS: return "Wrists";
+		case EQUIPMENT_SLOT_HANDS: return "Hands";
+		case EQUIPMENT_SLOT_BACK: return "Back";
+		case EQUIPMENT_SLOT_MAINHAND: return "Main hand";
+		case EQUIPMENT_SLOT_OFFHAND: return "Off hand";
+		case EQUIPMENT_SLOT_RANGED: return "Ranged";
+		case EQUIPMENT_SLOT_TABARD: return "Tabard";
+		default: return nullptr;
+    }
+}
+
+bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
+{
+    if (sTransmogConfig.enabled)
+    {
+        if (player && creature)
+        {
+			// Check if speaking with transmog npc
+			if (creature->GetEntry() != TRANSMOG_NPC_ENTRY)
+				return false;
+
+            player->GetPlayerMenu()->ClearMenus();
+			player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "How does transmogrification work?", EQUIPMENT_SLOT_END + 9, 0, "", 0);
+
+            // Only show the menu option for items that you have equipped
+            for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; slot++)
+            {
+                // No point in checking for tabard, shirt, necklace, rings or trinkets
+                if (slot == EQUIPMENT_SLOT_NECK || 
+					slot == EQUIPMENT_SLOT_FINGER1 || 
+					slot == EQUIPMENT_SLOT_FINGER2 || 
+					slot == EQUIPMENT_SLOT_TRINKET1 || 
+					slot == EQUIPMENT_SLOT_TRINKET2 || 
+					slot == EQUIPMENT_SLOT_TABARD || 
+					slot == EQUIPMENT_SLOT_BODY)
+				{
+                    continue;
+				}
+
+                // Only show the menu option for transmogrifiers that you have per slot
+                if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                {
+                    // Only show the menu option if there is a transmogrifying option available
+                    bool hasOption = false;
+
+					// Check in main inventory
+                    if (!hasOption)
+                    {
+                        for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+                        {
+                            if (Item* pTransmogrifier = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            {
+                                if (!CanTransmogrifyItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+								{
+                                    continue;
+								}
+
+                                hasOption = true;
+                                break;
+                            }
+                        }
+                    }
+
+					// Check in the other bags
+                    if (!hasOption)
+                    {
+                        for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
+                        {
+                            if (const auto pBag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
+                            {
+                                for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
+                                {
+                                    if (Item* pTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
+                                    {
+                                        if (!CanTransmogrifyItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+										{
+                                            continue;
+										}
+
+                                        hasOption = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // If we find a suitable transmog in the first bag then there's no point in checking the rest
+                            if (hasOption)
+							{
+                                break;
+							}
+                        }
+                    }
+
+					// Check in the bank's main inventory
+                    if (!hasOption)
+                    {
+                        for (uint8 i = BANK_SLOT_ITEM_START; i < BANK_SLOT_ITEM_END; ++i)
+                        {
+                            if (Item* pTransmogrifier = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            {
+                                if (!CanTransmogrifyItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+								{
+                                    continue;
+								}
+
+                                hasOption = true;
+                                break;
+                            }
+                        }
+                    }
+
+					// Check in the bank's other bags
+                    if (!hasOption)
+                    {
+                        for (uint8 i = BANK_SLOT_BAG_START; i < BANK_SLOT_BAG_END; ++i)
+                        {
+                            if (const auto pBag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
+                            {
+                                for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
+                                {
+                                    if (Item* pTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
+                                    {
+                                        if (!CanTransmogrifyItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+										{
+                                            continue;
+										}
+
+                                        hasOption = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (hasOption)
+							{
+                                break;
+							}
+                        }
+                    }
+
+                    if (hasOption)
+                    {
+                        std::string SlotName = GetSlotName(slot);
+                        if (SlotName.length() > 0)
+						{
+                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, SlotName.c_str(), EQUIPMENT_SLOT_END, slot, "", 0);
+						}
+                    }
+                }
+            }
+
+            // Remove all transmogrifiers
+            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, "Remove all transmogrifications.", EQUIPMENT_SLOT_END + 2, 0, "", 0);
+            player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+            return true;
+		}
+	}
+
+	return false;
+}
+
+bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
+{
+	
 }
 
 void TransmogMgr::LoadPlayerPresets(Player* player)
@@ -114,6 +292,124 @@ void TransmogMgr::UnloadPlayerPresets(Player* player)
         presetById[playerID].clear();
         presetByName[playerID].clear();
 	}
+}
+
+bool IsRangedWeapon(uint32 Class, uint32 SubClass)
+{
+    return Class == ITEM_CLASS_WEAPON && 
+			(SubClass == ITEM_SUBCLASS_WEAPON_BOW ||
+             SubClass == ITEM_SUBCLASS_WEAPON_GUN ||
+             SubClass == ITEM_SUBCLASS_WEAPON_CROSSBOW);
+}
+
+bool TransmogMgr::CanTransmogrifyItemWithItem(Player* player, const ItemPrototype* target, const ItemPrototype* source) const
+{
+    if (!target || !source)
+        return false;
+
+	// Same item
+    if (source->ItemId == target->ItemId)
+        return false;
+
+	// Same item model
+    if (source->DisplayInfoID == target->DisplayInfoID)
+        return false;
+
+	// Different item type
+    if (source->Class != target->Class)
+        return false;
+
+	// Invalid types
+    if (source->InventoryType == INVTYPE_BAG ||
+        source->InventoryType == INVTYPE_RELIC ||
+        source->InventoryType == INVTYPE_FINGER ||
+        source->InventoryType == INVTYPE_TRINKET ||
+        source->InventoryType == INVTYPE_AMMO ||
+        source->InventoryType == INVTYPE_QUIVER)
+	{
+        return false;
+	}
+
+	// Invalid types
+    if (target->InventoryType == INVTYPE_BAG ||
+        target->InventoryType == INVTYPE_RELIC ||
+        target->InventoryType == INVTYPE_FINGER ||
+        target->InventoryType == INVTYPE_TRINKET ||
+        target->InventoryType == INVTYPE_AMMO ||
+        target->InventoryType == INVTYPE_QUIVER)
+	{
+        return false;
+	}
+
+    if (!SuitableForTransmogrification(player, target) || !SuitableForTransmogrification(player, source))
+        return false;
+
+	// Ranged weapon check
+    if (IsRangedWeapon(source->Class, source->SubClass) != IsRangedWeapon(target->Class, target->SubClass))
+        return false;
+
+    if (source->InventoryType != target->InventoryType)
+    {
+        if (source->Class == ITEM_CLASS_WEAPON && 
+			!(IsRangedWeapon(target->Class, target->SubClass) 
+			  || (target->InventoryType == INVTYPE_WEAPON || 
+				  target->InventoryType == INVTYPE_2HWEAPON || 
+				  target->InventoryType == INVTYPE_WEAPONMAINHAND || 
+				  target->InventoryType == INVTYPE_WEAPONOFFHAND)
+			  && (source->InventoryType == INVTYPE_WEAPON || 
+				  source->InventoryType == INVTYPE_2HWEAPON || 
+				  source->InventoryType == INVTYPE_WEAPONMAINHAND || 
+				  source->InventoryType == INVTYPE_WEAPONOFFHAND)))
+		{
+            return false;
+		}
+
+        if (source->Class == ITEM_CLASS_ARMOR &&
+            !((source->InventoryType == INVTYPE_CHEST || 
+			   source->InventoryType == INVTYPE_ROBE) 
+			  &&
+               (target->InventoryType == INVTYPE_CHEST || 
+			    target->InventoryType == INVTYPE_ROBE)))
+		{
+            return false;
+		}
+    }
+
+    return true;
+}
+
+bool TransmogMgr::SuitableForTransmogrification(Player* player, const ItemPrototype* proto) const
+{
+    if (!player || !proto)
+        return false;
+
+	// Invalid types
+    if (proto->Class != ITEM_CLASS_ARMOR && proto->Class != ITEM_CLASS_WEAPON)
+        return false;
+
+    // Don't allow fishing poles
+    if (proto->Class == ITEM_CLASS_WEAPON && proto->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE)
+        return false;
+
+    // Check skill requirements
+    if (proto->RequiredSkill != 0)
+    {
+        if (player->GetSkillValue(static_cast<uint16>(proto->RequiredSkill)) == 0)
+            return false;
+
+        if (player->GetSkillValue(static_cast<uint16>(proto->RequiredSkill)) < proto->RequiredSkillRank)
+            return false;
+    }
+
+    // Check spell requirements
+    if (proto->RequiredSpell != 0 && !player->HasSpell(proto->RequiredSpell))
+        return false;
+
+    // Check level requirements
+    if (player->GetLevel() < proto->RequiredLevel)
+        return false;
+
+    return true;
 }
 
 /*
@@ -717,25 +1013,25 @@ void TransmogMgr::DeleteFakeFromDB(const ObjectGuid itemLowGuid)
 	CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE GUID = %u", itemLowGuid.GetCounter());
 }
 
-void TransmogMgr::CleanUp(Player* pPlayer)
+void TransmogMgr::CleanUp(Player* player)
 {
-	auto result = CharacterDatabase.PQuery("SELECT GUID, FakeEntry FROM custom_transmogrification WHERE Owner = %u", pPlayer->GetObjectGuid());
+	auto result = CharacterDatabase.PQuery("SELECT GUID, FakeEntry FROM custom_transmogrification WHERE Owner = %u", player->GetObjectGuid());
 	if (result)
 	{
 		do
 		{
 			const auto itemGUID = ObjectGuid(HIGHGUID_ITEM, (*result)[0].GetUInt32());
-			if (!pPlayer->GetItemByGuid(itemGUID))
+			if (!player->GetItemByGuid(itemGUID))
 				CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE GUID = %u", itemGUID.GetCounter());
 		} while (result->NextRow());
 	}
 }
 
-void TransmogMgr::BuildTransmogMap(Player* pPlayer)
+void TransmogMgr::BuildTransmogMap(Player* player)
 {
-	const ObjectGuid playerGUID = pPlayer->GetObjectGuid();
+	const ObjectGuid playerGUID = player->GetObjectGuid();
 	entryMap.erase(playerGUID);
-	auto result = CharacterDatabase.PQuery("SELECT GUID, FakeEntry FROM custom_transmogrification WHERE Owner = %u", pPlayer->GetObjectGuid());
+	auto result = CharacterDatabase.PQuery("SELECT GUID, FakeEntry FROM custom_transmogrification WHERE Owner = %u", player->GetObjectGuid());
 	if (result)
 	{
 		do
@@ -751,12 +1047,12 @@ void TransmogMgr::BuildTransmogMap(Player* pPlayer)
 	}
 }
 
-bool TransmogMgr::Refresh(Player* pPlayer, Item* pEquippedItem)
+bool TransmogMgr::Refresh(Player* player, Item* pEquippedItem)
 {
-	//if (!pPlayer || !pEquippedItem)
+	//if (!player || !pEquippedItem)
 	//	return false;
 
-	//if (pPlayer->AI())
+	//if (player->AI())
 	//	return false;
 	//
 	bool ok = false;
@@ -768,50 +1064,50 @@ bool TransmogMgr::Refresh(Player* pPlayer, Item* pEquippedItem)
 	//if (const uint32 Transmogrifier = GetFakeEntry(EquippedItemGUID))
 	//{
 	//	// We need to search for the Transmogrifier in all the bags and bank
-	//	if (Item* pItemTransmogrifier = pPlayer->GetItemByEntry(Transmogrifier))
+	//	if (Item* pItemTransmogrifier = player->GetItemByEntry(Transmogrifier))
 	//	{
 	//		const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//		if (pPlayer->GetUInt32Value(VisibleBase + 0) != pItemTransmogrifier->GetEntry())
+	//		if (player->GetUInt32Value(VisibleBase + 0) != pItemTransmogrifier->GetEntry())
 	//		{
-	//			pPlayer->SetVisibleItemSlot(slot, pItemTransmogrifier);
+	//			player->SetVisibleItemSlot(slot, pItemTransmogrifier);
 	//			ok = true;
 	//		}
 	//	}
 	//	else
 	//	{
 	//		// If we couldn't find the Transmogrifier then we need to delete it from the DB
-	//		DeleteFakeEntry(pPlayer, slot, pEquippedItem);
+	//		DeleteFakeEntry(player, slot, pEquippedItem);
 	//		const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//		if (pPlayer->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
-	//			pPlayer->SetVisibleItemSlot(slot, pEquippedItem);
+	//		if (player->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
+	//			player->SetVisibleItemSlot(slot, pEquippedItem);
 	//	}
 	//}
 
 	return ok;
 }
 
-bool TransmogMgr::RevertAll(Player* pPlayer)
+bool TransmogMgr::RevertAll(Player* player)
 {
-	if (!pPlayer)
+	if (!player)
 		return false;
 
 	bool ok = false;
-	//if (!pPlayer->RevertTransmogSlots.empty())
+	//if (!player->RevertTransmogSlots.empty())
 	//{
-	//	for (const auto slot : pPlayer->RevertTransmogSlots)
+	//	for (const auto slot : player->RevertTransmogSlots)
 	//	{
 	//		// If we find an equipped item then let's check if it's transmogrified
-	//		if (Item* pEquippedItem = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+	//		if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
 	//		{
 	//			const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//			if (pPlayer->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
+	//			if (player->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
 	//			{
-	//				pPlayer->SetVisibleItemSlot(slot, pEquippedItem);
+	//				player->SetVisibleItemSlot(slot, pEquippedItem);
 	//				ok = true;
 	//			}
 	//		}
 	//	}
-	//	pPlayer->RevertTransmogSlots.clear();
+	//	player->RevertTransmogSlots.clear();
 	//}
 	//else
 	//{
@@ -819,12 +1115,12 @@ bool TransmogMgr::RevertAll(Player* pPlayer)
 	//	for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
 	//	{
 	//		// If we find an equipped item then let's check if it's transmogrified
-	//		if (Item* pEquippedItem = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+	//		if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
 	//		{
 	//			const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//			if (pPlayer->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
+	//			if (player->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
 	//			{
-	//				pPlayer->SetVisibleItemSlot(slot, pEquippedItem);
+	//				player->SetVisibleItemSlot(slot, pEquippedItem);
 	//				ok = true;
 	//			}
 	//		}
@@ -834,9 +1130,9 @@ bool TransmogMgr::RevertAll(Player* pPlayer)
 	return ok;
 }
 
-bool TransmogMgr::ApplyAll(Player* pPlayer)
+bool TransmogMgr::ApplyAll(Player* player)
 {
-	//if (!pPlayer)
+	//if (!player)
 	//	return false;
 
 	bool ok = false;
@@ -844,7 +1140,7 @@ bool TransmogMgr::ApplyAll(Player* pPlayer)
 	//for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
 	//{
 	//	// If we find an equipped item then let's check if it's transmogrified
-	//	if (Item* pEquippedItem = pPlayer->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+	//	if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
 	//	{
 	//		// We need the equipped item's GUID to compare with the ones saved in the DB for each player
 	//		const ObjectGuid EquippedItemGUID = pEquippedItem->GetObjectGuid();
@@ -853,22 +1149,22 @@ bool TransmogMgr::ApplyAll(Player* pPlayer)
 	//		if (const uint32 Transmogrifier = GetFakeEntry(EquippedItemGUID))
 	//		{
 	//			// We need to search for the Transmogrifier in all the bags and bank
-	//			if (Item* pItemTransmogrifier = pPlayer->GetItemByEntry(Transmogrifier))
+	//			if (Item* pItemTransmogrifier = player->GetItemByEntry(Transmogrifier))
 	//			{
 	//				const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//				if (pPlayer->GetUInt32Value(VisibleBase + 0) != pItemTransmogrifier->GetEntry())
+	//				if (player->GetUInt32Value(VisibleBase + 0) != pItemTransmogrifier->GetEntry())
 	//				{
-	//					pPlayer->SetVisibleItemSlot(slot, pItemTransmogrifier);
+	//					player->SetVisibleItemSlot(slot, pItemTransmogrifier);
 	//					ok = true;
 	//				}
 	//			}
 	//			else
 	//			{
 	//				// If we couldn't find the Transmogrifier then we need to delete it from the DB
-	//				DeleteFakeEntry(pPlayer, slot, pEquippedItem);
+	//				DeleteFakeEntry(player, slot, pEquippedItem);
 	//				const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//				if (pPlayer->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
-	//					pPlayer->SetVisibleItemSlot(slot, pEquippedItem);
+	//				if (player->GetUInt32Value(VisibleBase + 0) != pEquippedItem->GetEntry())
+	//					player->SetVisibleItemSlot(slot, pEquippedItem);
 	//			}
 	//		}
 	//	}

@@ -1,9 +1,9 @@
-SET @Entry = 190010, @Name = "Magister Stellaria";
+SET @Entry := 190010;
 
 DELETE FROM `creature_template` WHERE `entry` = @Entry;
 
 INSERT INTO `creature_template` (`entry`, `modelid1`, `modelid2`, `name`, `subname`, `GossipMenuId`, `minlevel`, `maxlevel`, `faction`, `NpcFlags`, `scale`, `rank`, `DamageSchool`, `MeleeBaseAttackTime`, `RangedBaseAttackTime`, `unitClass`, `unitFlags`, `CreatureType`, `CreatureTypeFlags`, `lootid`, `PickpocketLootId`, `SkinningLootId`, `AIName`, `MovementType`, `RacialLeader`, `RegenerateStats`, `MechanicImmuneMask`, `ExtraFlags`, `ScriptName`) VALUES
-(@Entry, 2240, 0, @Name, "Transmogrifier", 0, 80, 80, 35, 1, 1, 0, 0, 2000, 0, 1, 0, 7, 138936390, 0, 0, 0, '', 0, 0, 1, 0, 0, 'npc_transmogrifier');
+(@Entry, 2240, 0, "Magister Stellaria", "Transmogrifier", 0, 80, 80, 35, 1, 1, 0, 0, 2000, 0, 1, 0, 7, 138936390, 0, 0, 0, '', 0, 0, 1, 0, 0, 'npc_transmogrifier');
 
 DELETE FROM `creature` WHERE `id` = @Entry;
 INSERT INTO `creature` (`id`, `map`, `spawnMask`, `position_x`, `position_y`, `position_z`, `orientation`, `spawntimesecsmin`, `spawntimesecsmax`, `spawndist`, `MovementType`) VALUES (@Entry, 0, 1, -8999.00000000000000000000, 851.19100000000000000000, 29.62100000000000000000, 3.88538000000000000000, 25, 25, 0, 0);
@@ -20,40 +20,49 @@ INSERT INTO `npc_text` (`ID`, `text0_0`) VALUES
 (@TEXT_ID+4, 'This item is already transmogrified.\r\nClick Remove to restore original look!'),
 (@TEXT_ID+5, 'This item is already transmogrified.\r\nClick Remove to restore original look,\r\n\or select a different one!');
 
+DELETE FROM `locales_npc_text` WHERE `entry` BETWEEN @TEXT_ID AND @TEXT_ID+5;
+INSERT INTO `locales_npc_text` (`entry`, `text0_0_loc6`) VALUES
+(@TEXT_ID, 'La transfiguración te permite cambiar la apariencia de tus artículos sin cambiar las estadísticas de los artículos.\r\nLos artículos usados en la transfiguración ya no son reembolsables, intercambiables y están vinculados a ti.\r\n\r\nNo todo se puede transfigurar entre sí.\r\nLas restricciones incluyen, pero no se limitan a:\r\nSolo se pueden transfigurar armaduras y armas\r\nArmas, arcos y ballestas se pueden transfigurar entre sí \r\nLas cañas de pescar no se pueden transfigurar.\r\nDebes poder equipar los dos elementos utilizados en el proceso.\r\n\r\nLas transfiguraciones permanecen en tus elementos mientras los poseas.\r\nSi intentas poner el elemento en el banco del gremio o enviarlo por correo a otra persona, la transfiguración se elimina.\r\n\r\nTambién puedes eliminar las transfiguraciones de forma gratuita en el transfigurador.'),
+(@TEXT_ID+1, 'Puedes guardar tus propios conjuntos de transfiguración.\r\n\r\nPara guardar, primero debes transfigurar tus elementos equipados.\r\nLuego, cuando vayas al menú de administración de conjunto y vayas al menú Guardar conjunto,\r\nse mostrarán todos los elementos que has transfigurado para que veas lo que estás guardando.\r\nSi crees que el conjunto está bien, puedes hacer clic para guardarlo y nombrarlo como quieras.\r\n\r\nPara usar un conjunto, puedes hacer clic en el conjunto guardado en el configurar el menú de administración y luego seleccionar usar conjunto.\r\nSi el conjunto tiene una transfiguración para un elemento que ya está transfigurado, la transfiguración anterior se pierde.\r\nTenga en cuenta que se aplican las mismas restricciones de transfiguración cuando intenta usar un conjunto como en la transfiguración normal.\r\n\r\nPara eliminar un conjunto, puede ir al menú del conjunto y seleccionar eliminar conjunto.'),
+(@TEXT_ID+2, 'Selecciona el aspecto deseado para esta ranura.'),
+(@TEXT_ID+3, '¡Consulta el precio y haga clic en Confirmar para cambiar el aspecto del artículo!'),
+(@TEXT_ID+4, 'Este elemento ya está transfigurado.\r\n¡Haz clic en Quitar para restaurar el aspecto original!'),
+(@TEXT_ID+5, 'Este elemento ya está transfigurado.\r\nHaz clic en Quitar para restaurar el aspecto original,\r\n\o selecciona uno diferente.');
+
 SET @STRING_ENTRY := 11100;
 
 DELETE FROM `mangos_string` WHERE `entry` BETWEEN  @STRING_ENTRY+0 AND @STRING_ENTRY+29;
-INSERT INTO `mangos_string` (`entry`, `content_default`) VALUES
-(@STRING_ENTRY+0, 'Item successfully transmogrified.'),
-(@STRING_ENTRY+1, 'Equipment slot is empty.'),
-(@STRING_ENTRY+2, 'Invalid source item selected.'),
-(@STRING_ENTRY+3, 'Source item does not exist.'),
-(@STRING_ENTRY+4, 'Destination item does not exist.'),
-(@STRING_ENTRY+5, 'Selected items are invalid.'),
-(@STRING_ENTRY+6, 'You don''t have  enough money.'),
-(@STRING_ENTRY+7, 'You don''t have enough tokens.'),
-(@STRING_ENTRY+8, 'Destination item already has this transmogrification.'),
-(@STRING_ENTRY+9, 'All your transmogrifications were removed.'),
-(@STRING_ENTRY+10, 'Item transmogrifications were removed.'),
-(@STRING_ENTRY+11, 'No transmogrification found.'),
-(@STRING_ENTRY+12, 'No transmogrification found on this item.'),
-(@STRING_ENTRY+13, 'Invalid name inserted.'),
-(@STRING_ENTRY+14, 'Showing transmogrifieded items, relog to update the current area.'),
-(@STRING_ENTRY+15, 'Hiding transmogrifieded items, relog to update the current area.'),
-(@STRING_ENTRY+16, 'The selected Item is not suitable for transmogrification.'),
-(@STRING_ENTRY+17, 'The selected Item cannot be used for transmogrification of the target player.'),
-(@STRING_ENTRY+18, 'You have no suitable items in your inventory.'),
-(@STRING_ENTRY+19, 'Remove: '),
-(@STRING_ENTRY+20, '< [Back]'),
-(@STRING_ENTRY+21, '< [Main Menu]'),
-(@STRING_ENTRY+22, 'Before: '), 
-(@STRING_ENTRY+23, 'After:'),
-(@STRING_ENTRY+24, 'Cost is '),
-(@STRING_ENTRY+25, 'Confirm'),
-(@STRING_ENTRY+26, 'Your item: '),
-(@STRING_ENTRY+27, 'Transmog: '),
-(@STRING_ENTRY+28, 'Possible transmogrifications:'),
-(@STRING_ENTRY+29, 'Options:');
+INSERT INTO `mangos_string` (`entry`, `content_default`, `content_loc6`) VALUES
+(@STRING_ENTRY+0, 'Item successfully transmogrified.', 'Objeto transfigurado con éxito.'),
+(@STRING_ENTRY+1, 'Equipment slot is empty.', 'La ranura del equipo está vacía.'),
+(@STRING_ENTRY+2, 'Invalid source item selected.', 'Se ha seleccionado un elemento de origen no válido.'),
+(@STRING_ENTRY+3, 'Source item does not exist.', 'El elemento de origen no existe.'),
+(@STRING_ENTRY+4, 'Destination item does not exist.', 'El elemento de destino no existe.'),
+(@STRING_ENTRY+5, 'Selected items are invalid.', 'Los elementos seleccionados no son válidos.'),
+(@STRING_ENTRY+6, 'You don''t have  enough money.', 'No tienes suficiente dinero.'),
+(@STRING_ENTRY+7, 'You don''t have enough tokens.', 'No tienes suficientes fichas.'),
+(@STRING_ENTRY+8, 'Destination item already has this transmogrification.', 'El elemento de destino ya tiene esta transfiguración.'),
+(@STRING_ENTRY+9, 'All your transmogrifications were removed.', 'Se eliminaron todas tus transfiguraciones.'),
+(@STRING_ENTRY+10, 'Item transmogrifications were removed.', 'Se eliminaron las transfiguraciones de objetos.'),
+(@STRING_ENTRY+11, 'No transmogrification found.', 'No se encontró transfiguración.'),
+(@STRING_ENTRY+12, 'No transmogrification found on this item.', 'No se ha encontrado transfiguración en este artículo.'),
+(@STRING_ENTRY+13, 'Invalid name inserted.', 'Nombre no válido insertado.'),
+(@STRING_ENTRY+14, 'Showing transmogrifieded items, relog to update the current area.', 'Mostrando elementos transfigurados, vuelva a iniciar sesión para actualizar el área actual.'),
+(@STRING_ENTRY+15, 'Hiding transmogrifieded items, relog to update the current area.', 'Ocultando elementos transfigurados, volver a iniciar sesión para actualizar el área actual.'),
+(@STRING_ENTRY+16, 'The selected Item is not suitable for transmogrification.', 'El artículo seleccionado no es adecuado para la transfiguración.'),
+(@STRING_ENTRY+17, 'The selected Item cannot be used for transmogrification of the target player.', 'El elemento seleccionado no se puede usar para la transfiguración del jugador objetivo.'),
+(@STRING_ENTRY+18, 'You have no suitable items in your inventory.', 'No tiene artículos adecuados en tu inventario.'),
+(@STRING_ENTRY+19, 'Remove: ', 'Quitar: '),
+(@STRING_ENTRY+20, '< [Back]', '< [Atras]'),
+(@STRING_ENTRY+21, '< [Main Menu]', '< [Menu Principal]'),
+(@STRING_ENTRY+22, 'Before: ', 'Antes: '), 
+(@STRING_ENTRY+23, 'After:', 'Despues: '),
+(@STRING_ENTRY+24, 'Cost is ', 'El precio es '),
+(@STRING_ENTRY+25, 'Confirm', 'Confirmar'),
+(@STRING_ENTRY+26, 'Your item: ', 'Tu objeto: '),
+(@STRING_ENTRY+27, 'Transmog: ', 'Transmodificación'),
+(@STRING_ENTRY+28, 'Possible transmogrifications:', 'Posible transmodificaciónes:'),
+(@STRING_ENTRY+29, 'Options:', 'Opciones:');
 
 DELETE FROM `command` WHERE `name` IN ('transmog', 'transmog add', 'transmog add set');
 INSERT INTO `command` (`name`, `security`, `help`) VALUES
