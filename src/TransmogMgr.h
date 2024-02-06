@@ -71,7 +71,9 @@ public:
     void OnPlayerLogout(Player* player);
 
 private:
-    void UnloadPlayerPresets(const ObjectGuid& playerID);
+    // Presets
+    void LoadPlayerPresets(Player* player);
+    void UnloadPlayerPresets(Player* player);
 
 private:
     TransmogMap entryMap;

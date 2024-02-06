@@ -2,10 +2,28 @@
 #include "TransmogConfig.h"
 
 #include "Entities/Player.h"
+#include "Globals/ObjectMgr.h"
 
 void TransmogMgr::Init()
 {
 	sTransmogConfig.Initialize();
+
+	if (sTransmogConfig.enabled)
+	{
+		// Delete corrupted transmog config
+		CharacterDatabase.Execute("DELETE FROM custom_transmogrification WHERE NOT EXISTS (SELECT 1 FROM item_instance WHERE item_instance.guid = custom_transmogrification.GUID)");
+	
+		if (sTransmogConfig.presetsEnabled)
+		{
+			// Delete presets for non existing player characters
+			CharacterDatabase.Execute("DELETE FROM `custom_transmogrification_sets` WHERE NOT EXISTS(SELECT 1 FROM characters WHERE characters.guid = custom_transmogrification_sets.Owner)");
+		
+            sWorld.ExecuteForAllSessions([this](WorldSession& worldSession)
+            {
+				LoadPlayerPresets(worldSession.GetPlayer());
+            });
+		}
+	}
 }
 
 void TransmogMgr::OnPlayerLogout(Player* player)
@@ -24,21 +42,78 @@ void TransmogMgr::OnPlayerLogout(Player* player)
 
             if (sTransmogConfig.presetsEnabled)
             {
-				UnloadPlayerPresets(playerID);
+				UnloadPlayerPresets(player);
             }
         }
 	}
 }
 
-void TransmogMgr::UnloadPlayerPresets(const ObjectGuid& playerID)
+void TransmogMgr::LoadPlayerPresets(Player* player)
 {
-    for (auto it = presetById[playerID].begin(); it != presetById[playerID].end(); ++it)
-	{
-        it->second.clear();
-	}
+    if (player)
+    {
+        const ObjectGuid playerID = player->GetObjectGuid();
+        auto result = CharacterDatabase.PQuery("SELECT `PresetID`, `SetName`, `SetData` FROM `custom_transmogrification_sets` WHERE Owner = %u", playerID.GetCounter());
+        if (result)
+        {
+            do
+            {
+				Field* fields = result->Fetch();
+                const uint8 presetID = fields[0].GetUInt8();
+                const std::string presetName = fields[1].GetString();
+                std::istringstream presetData (fields[2].GetString());
 
-    presetById[playerID].clear();
-    presetByName[playerID].clear();
+                while (presetData.good())
+                {
+                    uint32 slot;
+                    uint32 entry;
+                    presetData >> slot >> entry;
+
+                    if (presetData.fail())
+					{
+                        break;
+					}
+
+                    if (slot >= EQUIPMENT_SLOT_END)
+                    {
+                        sLog.outError("Item entry (FakeEntry: %u, player: %s, slot: %u, presetId: %u) has invalid slot, ignoring.", entry, std::to_string(playerID).c_str(), slot, uint32(presetID));
+                        continue;
+                    }
+
+                    if (sObjectMgr.GetItemPrototype(entry))
+					{
+                        presetById[playerID][presetID][slot] = entry;
+					}
+                }
+
+                if (!presetById[playerID][presetID].empty())
+                {
+                    presetByName[playerID][presetID] = presetName;
+                }
+                else
+                {
+                    presetById[playerID].erase(presetID);
+                    CharacterDatabase.PExecute("DELETE FROM `custom_transmogrification_sets` WHERE Owner = %u AND PresetID = %u", playerID.GetCounter(), presetID);
+                }
+            } 
+			while (result->NextRow());
+        }
+	}
+}
+
+void TransmogMgr::UnloadPlayerPresets(Player* player)
+{
+	if (player)
+	{
+		const ObjectGuid playerID = player->GetObjectGuid();
+        for (auto it = presetById[playerID].begin(); it != presetById[playerID].end(); ++it)
+        {
+            it->second.clear();
+        }
+
+        presetById[playerID].clear();
+        presetByName[playerID].clear();
+	}
 }
 
 /*
