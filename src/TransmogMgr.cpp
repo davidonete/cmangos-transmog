@@ -223,7 +223,262 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
 
 bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
 {
-	
+    if (sTransmogConfig.enabled)
+    {
+        if (player && creature)
+        {
+            // Check if speaking with transmog npc
+            if (creature->GetEntry() != TRANSMOG_NPC_ENTRY)
+                return false;
+
+			const ObjectGuid playerId = player->GetObjectGuid();
+
+            player->GetPlayerMenu()->ClearMenus();
+            WorldSession* session = player->GetSession();
+            switch (sender)
+            {
+				// Show items you can use
+				case EQUIPMENT_SLOT_END:
+				{
+					ShowTransmogItems(player, creature, action);
+					break;
+				}
+
+				// Main menu
+				case EQUIPMENT_SLOT_END + 1: 
+				{
+					OnPlayerGossipHello(player, creature);
+					break;
+				}
+
+				// Remove Transmogrifications
+				case EQUIPMENT_SLOT_END + 2: 
+				{
+					bool removed = false;
+					CharacterDatabase.BeginTransaction();
+					for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+					{
+						if (Item* newItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+						{
+							if (!GetFakeEntry(newItem->GetObjectGuid()))
+								continue;
+
+							DeleteFakeEntry(player, slot, newItem);
+							removed = true;
+						}
+					}
+
+					if (removed)
+					{
+						session->SendAreaTriggerMessage("%s", LANG_ERR_UNTRANSMOG_OK);
+						CharacterDatabase.CommitTransaction();
+					}
+					else
+					{
+						session->SendNotification(LANG_ERR_UNTRANSMOG_NO_TRANSMOGS);
+					}
+
+					OnPlayerGossipHello(player, creature);
+					break;
+				} 
+
+				// Remove Transmogrification from single item
+				case EQUIPMENT_SLOT_END + 3: 
+				{
+					if (Item* newItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, action))
+					{
+						if (GetFakeEntry(newItem->GetObjectGuid()))
+						{
+							DeleteFakeEntry(player, action, newItem);
+							session->SendAreaTriggerMessage("%s", LANG_ERR_UNTRANSMOG_OK);
+						}
+						else
+						{
+							session->SendNotification(LANG_ERR_UNTRANSMOG_NO_TRANSMOGS);
+						}
+					}
+
+					OnPlayerGossipSelect(player, creature, EQUIPMENT_SLOT_END, action);
+					break;
+				}
+
+				// Presets menu
+				case EQUIPMENT_SLOT_END + 4: 
+				{
+					if (!sTransmogConfig.presetsEnabled)
+					{
+						OnPlayerGossipHello(player, creature);
+						return true;
+					}
+
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "How do sets work?", EQUIPMENT_SLOT_END + 10, 0, "", 0);
+					
+					for (auto it = presetByName[playerId].begin(); it != presetByName[playerId].end(); ++it)
+					{
+						player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "zz?", EQUIPMENT_SLOT_END + 6, it->first, "", 0);
+					}
+
+					if (presetByName[playerId].size() < GetMaxSets())
+					{
+						player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Save set", EQUIPMENT_SLOT_END + 8, 0, "", 0);
+					}
+
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 1, 0, "", 0);
+					player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+					break;
+				} 
+
+				// Use preset
+				case EQUIPMENT_SLOT_END + 5: 
+				{
+					if (!sTransmogConfig.presetsEnabled)
+					{
+						OnPlayerGossipHello(player, creature);
+						return true;
+					}
+
+					// action = presetID
+					for (auto it = presetById[playerId][action].begin(); it != presetById[playerId][action].end(); ++it)
+					{
+						if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, it->first))
+						{
+							PresetTransmog(player, item, it->second, it->first);
+						}
+					}
+
+					OnPlayerGossipSelect(player, creature, EQUIPMENT_SLOT_END + 6, action);
+					break;
+				}
+
+				// View preset
+				case EQUIPMENT_SLOT_END + 6: 
+				{
+					if (!sTransmogConfig.presetsEnabled)
+					{
+						OnPlayerGossipHello(player, creature);
+						return true;
+					}
+
+					// action = presetID
+					for (auto it = presetById[playerId][action].begin(); it != presetById[playerId][action].end(); ++it)
+					{
+						player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "zzz", sender, action, "", 0);
+					}
+
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Use this set", EQUIPMENT_SLOT_END + 5, action, "Using this set for transmogrify will bind transmogrified items to you and make them non-refundable and non-tradeable.\nDo you wish to continue?\n\n" + presetByName[playerId][action], false);
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Delete set", EQUIPMENT_SLOT_END + 7, action, "Are you sure you want to delete " + presetByName[playerId][action] + "?", false);
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 4, 0, "", 0);
+					player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+					break;
+				} 
+
+				// Delete preset
+				case EQUIPMENT_SLOT_END + 7: 
+				{
+					if (!sTransmogConfig.presetsEnabled)
+					{
+						OnPlayerGossipHello(player, creature);
+						return true;
+					}
+
+					// action = presetID
+					CharacterDatabase.PExecute("DELETE FROM `custom_transmogrification_sets` WHERE Owner = %u AND PresetID = %u", playerId, action);
+					presetById[playerId][action].clear();
+					presetById[playerId].erase(action);
+					presetByName[playerId].erase(action);
+
+					OnPlayerGossipSelect(player, creature, EQUIPMENT_SLOT_END + 4, 0);
+					break;
+				} 
+
+				// Save preset
+				case EQUIPMENT_SLOT_END + 8: 
+				{
+					if (!sTransmogConfig.presetsEnabled || presetByName[playerId].size() >= GetMaxSets())
+					{
+						OnPlayerGossipHello(player, creature);
+						return true;
+					}
+
+					uint32 cost = 0;
+					bool canSave = false;
+					for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+					{
+						if (!GetSlotName(slot))
+							continue;
+
+						if (Item* newItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+						{
+							uint32 entry = GetFakeEntry(newItem->GetObjectGuid());
+							if (!entry)
+								continue;
+
+							const ItemPrototype* temp = sObjectMgr.GetItemPrototype(entry);
+							if (!temp)
+								continue;
+
+							if (!SuitableForTransmogrification(player, temp))
+								continue;
+
+							cost += GetSellPrice(newItem);
+							canSave = true;
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "zzzu", EQUIPMENT_SLOT_END + 8, 0, "", 0);
+						}
+					}
+					if (canSave)
+						player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Save set", 0, 0, "Insert set name", true);
+
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Update menu", sender, action, "", 0);
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 4, 0, "", 0);
+					player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+					break;
+				} 
+
+				// Set info
+				case EQUIPMENT_SLOT_END + 10: 
+				{
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 4, 0, "", 0);
+					player->GetPlayerMenu()->SendGossipMenu(GetSetNpcText(), creature->GetObjectGuid());
+					break;
+				} 
+
+				// Transmog info
+				case EQUIPMENT_SLOT_END + 9: 
+				{
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 1, 0, "", 0);
+					player->GetPlayerMenu()->SendGossipMenu(GetTransmogNpcText(), creature->GetObjectGuid());
+					break;
+				} 
+
+				// Transmogrify
+				default: 
+				{
+					if (!sender && !action)
+					{
+						OnPlayerGossipHello(player, creature);
+						return true;
+					}
+					// sender = slot, action = display
+					TransmogAcoreStrings res = Transmogrify(player, ObjectGuid(HIGHGUID_ITEM, action), sender);
+					if (res == LANG_ERR_TRANSMOG_OK)
+					{
+						session->SendAreaTriggerMessage("%s", LANG_ERR_TRANSMOG_OK);
+					}
+					else
+					{
+						session->SendNotification(res);
+					}
+
+					player->GetPlayerMenu()->CloseGossip();
+					break;
+				} 
+            }
+
+            return true;
+		}
+	}
+
+	return false;
 }
 
 void TransmogMgr::LoadPlayerPresets(Player* player)
@@ -410,6 +665,195 @@ bool TransmogMgr::SuitableForTransmogrification(Player* player, const ItemProtot
         return false;
 
     return true;
+}
+
+uint32 GetSellPrice(const Item* item)
+{
+	if (item)
+	{
+		const ItemPrototype* proto = item->GetProto();
+		return proto->SellPrice ? proto->SellPrice : 100U;
+	}
+
+    return 0U;
+}
+
+std::string GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y)
+{
+    std::ostringstream ss;
+    ss << "|TInterface";
+
+    const ItemPrototype* temp = sObjectMgr.GetItemPrototype(entry);
+    const ItemDisplayInfoEntry* dispInfo = nullptr;
+    if (temp)
+    {
+        GameObjectDisplayInfoEntry const* info = sGameObjectDisplayInfoStore.LookupEntry(temp->DisplayInfoID);
+        dispInfo = sItemStorage.LookupEntry<ItemDisplayInfoEntry>(temp->DisplayInfoID);
+        if (dispInfo)
+		{
+            ss << "/ICONS/" << dispInfo->ID;
+		}
+    }
+
+    if (!dispInfo)
+	{
+        ss << "/InventoryItems/WoWUnknownItem01";
+	}
+
+    ss << ":" << width << ":" << height << ":" << x << ":" << y << "|t";
+    return ss.str();
+}
+
+std::string GetItemLink(Item* item, WorldSession* session)
+{
+	int loc_idx = session->GetSessionDbLocaleIndex();
+	const ItemPrototype* temp = item->GetProto();
+	std::string name = temp->Name1;
+
+	std::ostringstream oss;
+	oss << "|c" << std::hex << ItemQualityColors[temp->Quality] << std::dec <<
+		"|Hitem:" << temp->ItemId << ":" <<
+		item->GetEnchantmentId(PERM_ENCHANTMENT_SLOT) << ":" <<
+		item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_0) << ":" <<
+		item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_1) << ":" <<
+		item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_2) << ":" <<
+		item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_3) << ":" <<
+		item->GetItemRandomPropertyId() << ":" << item->GetItemSuffixFactor() << ":" <<
+		item->GetOwner()->GetLevel() << "|h[" << name << "]|h|r";
+
+	return oss.str();
+}
+
+std::string GetItemLink(uint32 entry, WorldSession* session)
+{
+	const ItemPrototype* temp = sObjectMgr.GetItemPrototype(entry);
+	int loc_idx = session->GetSessionDbLocaleIndex();
+	std::string name = temp->Name1;
+	std::ostringstream oss;
+	oss << "|c" << std::hex << ItemQualityColors[temp->Quality] << std::dec << "|Hitem:" << entry << ":0:0:0:0:0:0:0:0:0|h[" << name << "]|h|r";
+	return oss.str();
+}
+
+void TransmogMgr::ShowTransmogItems(Player* player, Creature* creature, uint8 slot)
+{
+    WorldSession* session = player->GetSession();
+    Item* oldItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+    if (oldItem)
+    {
+        uint32 limit = 0;
+        uint32 price = GetSellPrice(oldItem);
+        price += sTransmogConfig.costFee;
+		price *= sTransmogConfig.costMultiplier;
+
+        std::ostringstream ss;
+        ss << std::endl;
+
+        for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+        {
+            if (limit > MAX_OPTIONS)
+                break;
+
+            Item* newItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i);
+            if (!newItem)
+                continue;
+
+            if (!CanTransmogrifyItemWithItem(player, oldItem->GetProto(), newItem->GetProto()))
+                continue;
+
+            if (GetFakeEntry(oldItem->GetObjectGuid()) == newItem->GetEntry())
+                continue;
+
+            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, ss.str(), price, false, "", 0);
+
+			++limit;
+        }
+
+        for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
+        {
+            const auto bag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i));
+            if (!bag)
+                continue;
+
+            for (uint32 j = 0; j < bag->GetBagSize(); ++j)
+            {
+                if (limit > MAX_OPTIONS)
+                    break;
+
+                Item* newItem = player->GetItemByPos(i, j);
+                if (!newItem)
+                    continue;
+
+                if (!CanTransmogrifyItemWithItem(player, oldItem->GetProto(), newItem->GetProto()))
+                    continue;
+
+                if (GetFakeEntry(oldItem->GetObjectGuid()) == newItem->GetEntry())
+                    continue;
+
+                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, 
+																	 GetItemIcon(newItem->GetEntry(), 30, 30, -18, 0) + GetItemLink(newItem, session), 
+																	 slot, 
+																	 newItem->GetObjectGuid().GetCounter(), 
+																	 "Using this item for transmogrify will bind it to you and make it non-refundable and non-tradeable.\nDo you wish to continue?\n\n" + GetItemIcon(newItem->GetEntry(), 40, 40, -15, -10) + GetItemLink(newItem, session) + ss.str(),  
+																	 false);
+            
+				++limit;
+			}
+        }
+    }
+
+	player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Remove transmogrification", EQUIPMENT_SLOT_END + 3, slot, "Remove transmogrification from the slot?", false);
+    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Update menu", EQUIPMENT_SLOT_END, slot, "", 0);
+    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 1, 0, "", 0);
+    player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+}
+
+void TransmogMgr::UpdateTransmogItem(Player* player, Item* item) const
+{
+    if (item->IsEquipped())
+	{
+        player->SetVisibleItemSlot(item->GetSlot(), item);
+	}
+}
+
+uint32 TransmogMgr::GetFakeEntry(const ObjectGuid& itemGUID) const
+{
+    const auto itr = dataMap.find(itemGUID);
+    if (itr == dataMap.end()) return 0;
+    const auto itr2 = entryMap.find(itr->second);
+    if (itr2 == entryMap.end()) return 0;
+    const auto itr3 = itr2->second.find(itemGUID);
+    if (itr3 == itr2->second.end()) return 0;
+    return itr3->second;
+}
+
+void TransmogMgr::SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified)
+{
+    const ObjectGuid itemGUID = itemTransmogrified->GetObjectGuid();
+    entryMap[player->GetObjectGuid()][itemGUID] = newEntry;
+    dataMap[itemGUID] = player->GetObjectGuid();
+    CharacterDatabase.PExecute("REPLACE INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES (%u, %u, %u)", itemGUID.GetCounter(), newEntry, player->GetObjectGuid());
+    UpdateTransmogItem(player, itemTransmogrified);
+}
+
+void TransmogMgr::DeleteFakeEntry(Player* player, uint8, Item* itemTransmogrified)
+{
+    DeleteFakeEntryFromDB(itemTransmogrified->GetObjectGuid());
+    UpdateTransmogItem(player, itemTransmogrified);
+}
+
+void TransmogMgr::DeleteFakeEntryFromDB(const ObjectGuid& itemGUID)
+{
+    if (dataMap.find(itemGUID) != dataMap.end())
+    {
+        if (entryMap.find(dataMap[itemGUID]) != entryMap.end())
+		{
+            entryMap[dataMap[itemGUID]].erase(itemGUID);
+		}
+
+        dataMap.erase(itemGUID);
+    }
+
+    CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE GUID = %u", itemGUID.GetCounter());
 }
 
 /*
@@ -649,7 +1093,7 @@ uint32 TransmogMgr::GetFakeEntry(const ObjectGuid itemGUID) const
 	return itr3->second;
 }
 
-void TransmogMgr::UpdateItem(Player* player, Item* item) const
+void TransmogMgr::UpdateTransmogItem(Player* player, Item* item) const
 {
 	if (item->IsEquipped())
 		player->SetVisibleItemSlot(item->GetSlot(), item);
@@ -659,8 +1103,8 @@ void TransmogMgr::DeleteFakeEntry(Player* player, uint8, Item* itemTransmogrifie
 {
 	//if (!GetFakeEntry(item))
 	//    return false;
-	DeleteFakeFromDB(itemTransmogrified->GetObjectGuid());
-	UpdateItem(player, itemTransmogrified);
+	DeleteFakeEntryFromDB(itemTransmogrified->GetObjectGuid());
+	UpdateTransmogItem(player, itemTransmogrified);
 }
 
 void TransmogMgr::SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified)
@@ -669,7 +1113,7 @@ void TransmogMgr::SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransm
 	entryMap[player->GetObjectGuid()][itemGUID] = newEntry;
 	dataMap[itemGUID] = player->GetObjectGuid();
 	CharacterDatabase.PExecute("REPLACE INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES (%u, %u, %u)", itemGUID.GetCounter(), newEntry, player->GetObjectGuid());
-	UpdateItem(player, itemTransmogrified);
+	UpdateTransmogItem(player, itemTransmogrified);
 }
 
 TransmogAcoreStrings TransmogMgr::Transmogrify(Player* player, ObjectGuid TransmogrifierGUID, uint8 slot, bool no_cost)
@@ -721,7 +1165,7 @@ TransmogAcoreStrings TransmogMgr::Transmogrify(Player* player, ObjectGuid Transm
 					return LANG_ERR_TRANSMOG_NOT_ENOUGH_TOKENS;
 			}
 
-			uint32 cost = GetSpecialPrice(itemTransmogrified->GetProto());
+			uint32 cost = GetSellPrice(itemTransmogrified->GetProto());
 			cost *= ScaledCostModifier;
 			cost += CopperCost;
 
@@ -833,7 +1277,7 @@ bool TransmogMgr::SuitableForTransmogrification(Player* player, ItemPrototype co
 	return true;
 }
 
-uint32 TransmogMgr::GetSpecialPrice(ItemPrototype const* proto) const
+uint32 TransmogMgr::GetSellPrice(ItemPrototype const* proto) const
 {
 	uint32 cost = proto->SellPrice ? proto->SellPrice : 100;
 	return cost;
@@ -999,7 +1443,7 @@ void TransmogMgr::LoadConfig(bool reload)
 	}
 }
 
-void TransmogMgr::DeleteFakeFromDB(const ObjectGuid itemLowGuid)
+void TransmogMgr::DeleteFakeEntryFromDB(const ObjectGuid itemLowGuid)
 {
 	const ObjectGuid itemGUID = itemLowGuid;
 

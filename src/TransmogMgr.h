@@ -5,16 +5,14 @@
 
 #include <unordered_map>
 
-//#define PRESETS // comment this line to disable preset feature totally
-
 #define MAX_OPTIONS 25
 #define TRANSMOG_NPC_ENTRY 190010
 
+class Item;
 class Player;
 
 struct ItemPrototype;
 
-//class Item;
 //class WorldSession;
 
 enum TransmogAcoreStrings
@@ -84,6 +82,12 @@ private:
     bool SuitableForTransmogrification(Player* player, const ItemPrototype* proto) const;
 
     void ShowTransmogItems(Player* player, Creature* creature, uint8 slot);
+    void UpdateTransmogItem(Player* player, Item* item) const;
+
+    uint32 GetFakeEntry(const ObjectGuid& itemGUID) const;
+    void SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified);
+    void DeleteFakeEntry(Player* player, uint8, Item* itemTransmogrified);
+    void DeleteFakeEntryFromDB(const ObjectGuid& itemGUID);
 
 private:
     TransmogMap entryMap;

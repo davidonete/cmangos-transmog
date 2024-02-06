@@ -11,6 +11,10 @@
 #        Default: 1 (enabled)
 #                 0 (disabled)
 #
+#    Transmog.MaxPresets
+#        The maximum amount of presets that a player can save. Must be below 25
+#        Default: 10
+#
 #    Transmog.CostFee
 #        How much (in copper) should the player pay extra per transmog item
 #		 The total price is (sell price + cost fee) * cost multiplier
@@ -25,5 +29,6 @@
 
 Transmog.Enable = 0
 Transmog.Presets = 1
+Transmog.MaxPresets = 10
 Transmog.CostFee = 0
 Transmog.CostMultiplier = 1.0
