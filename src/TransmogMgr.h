@@ -72,18 +72,19 @@ public:
     void OnPlayerMoveItemFromInventory(Player* player, Item* item);
 
 private:
-    bool CanTransmogItemWithItem(Player* player, const ItemPrototype* target, const ItemPrototype* source) const;
-    bool SuitableForTransmog(Player* player, const ItemPrototype* proto) const;
+    bool CanApplyTransmog(Player* player, const Item* target, const Item* source) const;
+    bool SuitableForTransmog(Player* player, const Item* item) const;
 
     void ShowTransmogItems(Player* player, Creature* creature, uint8 slot);
     void UpdateTransmogItem(Player* player, Item* item) const;
-    void PresetTransmogItem(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot);
-    TransmogLanguage TransmogItem(Player* player, Item* sourceItem, Item* targetItem);
+    //void PresetTransmogItem(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot);
+    TransmogLanguage ApplyTransmog(Player* player, Item* sourceItem, Item* targetItem);
+    uint32 GetTransmogPrice(const Item* item) const;
 
-    uint32 GetFakeEntry(const ObjectGuid& itemGUID) const;
-    void SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified);
-    void DeleteFakeEntry(Player* player, uint8, Item* itemTransmogrified);
-    void DeleteFakeEntryFromDB(const ObjectGuid& itemGUID);
+    uint32 GetFakeEntry(Item* item) const;
+    void SetFakeEntry(Player* player, uint32 newEntry, Item* item);
+    void DeleteFakeEntry(Player* player, uint8, Item* item);
+    void DeleteFakeEntryFromDB(Item* item);
 
 private:
     TransmogMap entryMap;
