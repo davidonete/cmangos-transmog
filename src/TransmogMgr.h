@@ -5,17 +5,12 @@
 
 #include <unordered_map>
 
-#define MAX_OPTIONS 25
-#define TRANSMOG_NPC_ENTRY 190010
-
 class Item;
 class Player;
 
 struct ItemPrototype;
 
-//class WorldSession;
-
-enum TransmogAcoreStrings
+enum TransmogLanguage
 {
     LANG_ERR_TRANSMOG_OK = 11100,
     LANG_ERR_TRANSMOG_INVALID_SLOT,
@@ -74,15 +69,16 @@ public:
     bool OnPlayerGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action);
 
 private:
-    // Presets
     void LoadPlayerPresets(Player* player);
     void UnloadPlayerPresets(Player* player);
 
-    bool CanTransmogrifyItemWithItem(Player* player, const ItemPrototype* target, const ItemPrototype* source) const;
-    bool SuitableForTransmogrification(Player* player, const ItemPrototype* proto) const;
+    bool CanTransmogItemWithItem(Player* player, const ItemPrototype* target, const ItemPrototype* source) const;
+    bool SuitableForTransmog(Player* player, const ItemPrototype* proto) const;
 
     void ShowTransmogItems(Player* player, Creature* creature, uint8 slot);
     void UpdateTransmogItem(Player* player, Item* item) const;
+    void PresetTransmogItem(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot);
+    TransmogLanguage TransmogItem(Player* player, ObjectGuid sourceItemGUID, uint8 targetItemSlot, bool noCost);
 
     uint32 GetFakeEntry(const ObjectGuid& itemGUID) const;
     void SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified);
