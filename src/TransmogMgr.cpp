@@ -247,7 +247,7 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
 				}
 
                 // Only show the menu option for transmogrifiers that you have per slot
-                if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                if (Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
                 {
                     // Only show the menu option if there is a transmogrifying option available
                     bool hasOption = false;
@@ -257,9 +257,9 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
                     {
                         for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
                         {
-                            if (Item* pTransmogrifier = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            if (Item* sourceItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                             {
-                                if (!CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+                                if (!CanTransmogItemWithItem(player, targetItem->GetProto(), sourceItem->GetProto()))
 								{
                                     continue;
 								}
@@ -279,9 +279,9 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
                             {
                                 for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
                                 {
-                                    if (Item* pTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
+                                    if (Item* sourceItem = pBag->GetItemByPos(static_cast<uint8>(j)))
                                     {
-                                        if (!CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+                                        if (!CanTransmogItemWithItem(player, targetItem->GetProto(), sourceItem->GetProto()))
 										{
                                             continue;
 										}
@@ -305,9 +305,9 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
                     {
                         for (uint8 i = BANK_SLOT_ITEM_START; i < BANK_SLOT_ITEM_END; ++i)
                         {
-                            if (Item* pTransmogrifier = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            if (Item* sourceItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                             {
-                                if (!CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+                                if (!CanTransmogItemWithItem(player, targetItem->GetProto(), sourceItem->GetProto()))
 								{
                                     continue;
 								}
@@ -327,9 +327,9 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
                             {
                                 for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
                                 {
-                                    if (Item* pTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
+                                    if (Item* sourceItem = pBag->GetItemByPos(static_cast<uint8>(j)))
                                     {
-                                        if (!CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pTransmogrifier->GetProto()))
+                                        if (!CanTransmogItemWithItem(player, targetItem->GetProto(), sourceItem->GetProto()))
 										{
                                             continue;
 										}
@@ -349,10 +349,10 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
 
                     if (hasOption)
                     {
-                        std::string SlotName = GetSlotName(slot);
-                        if (SlotName.length() > 0)
+                        std::string slotName = GetSlotName(slot);
+                        if (slotName.length() > 0)
 						{
-                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, SlotName.c_str(), EQUIPMENT_SLOT_END, slot, "", 0);
+                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, slotName.c_str(), EQUIPMENT_SLOT_END, slot, "", 0);
 						}
                     }
                 }
@@ -378,9 +378,8 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
             if (creature->GetEntry() != TRANSMOG_NPC_ENTRY)
                 return false;
 
-			std::map<uint32, Item*> transmogItems;
 			const uint64 playerID = player->GetObjectGuid();
-			WorldSession* playerSession = playerSession;
+			WorldSession* playerSession = player->GetSession();
 
             player->GetPlayerMenu()->ClearMenus();
 			switch (sender)
@@ -388,28 +387,29 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                 // Display the available transmogs inside the options
                 case EQUIPMENT_SLOT_END:
                 {
+					std::map<uint32, Item*> transmogItems;
                     if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, static_cast<uint8>(action)))
                     {
-                        const ObjectGuid EquippedItemGUID = pEquippedItem->GetObjectGuid();
+                        const ObjectGuid equippedItemGUID = pEquippedItem->GetObjectGuid();
                         if (ItemPrototype const* equippedProto = pEquippedItem->GetProto())
                         {
-                            std::string yourItem;
-                            const std::string equip_name = equippedProto->Name1;
-                            yourItem = playerSession->GetMangosString(LANG_MENU_YOUR_ITEM) + equip_name;
-                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, yourItem.c_str(), sender, action, "", 0);
+                            const std::string itemName = equippedProto->Name1;
+							const std::string itemOption = playerSession->GetMangosString(LANG_MENU_YOUR_ITEM) + itemName;
+                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, itemOption.c_str(), sender, action, "", 0);
                         }
 
                         // Check in main inventory
                         for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; i++)
                         {
-                            if (Item* pItemTransmogrifier = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            if (Item* transmogItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                             {
-                                if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+								const uint32 transmogItemEntry = transmogItem->GetEntry();
+                                if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), transmogItem->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != transmogItemEntry)
                                 {
-                                    if (transmogItems.find(pItemTransmogrifier->GetProto()->DisplayInfoID) == transmogItems.end())
+                                    if (transmogItems.find(transmogItemEntry) == transmogItems.end())
                                     {
-                                        transmogItems[pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
-                                        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, pItemTransmogrifier->GetProto()->Name1, action + 100, pItemTransmogrifier->GetProto()->DisplayInfoID, "", 0);
+                                        transmogItems[transmogItemEntry] = transmogItem;
+                                        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, transmogItem->GetProto()->Name1, action + 100, transmogItemEntry, "", 0);
                                     }
                                 }
                             }
@@ -422,14 +422,15 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                             {
                                 for (uint32 j = 0; j < pBag->GetBagSize(); j++)
                                 {
-                                    if (Item* pItemTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
+                                    if (Item* transmogItem = pBag->GetItemByPos(static_cast<uint8>(j)))
                                     {
-                                        if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+										const uint32 transmogItemEntry = transmogItem->GetEntry();
+                                        if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), transmogItem->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != transmogItemEntry)
                                         {
-                                            if (transmogItems.find(pItemTransmogrifier->GetProto()->DisplayInfoID) == transmogItems.end())
+                                            if (transmogItems.find(transmogItemEntry) == transmogItems.end())
                                             {
-                                                transmogItems[pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
-                                                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, pItemTransmogrifier->GetProto()->Name1, action + 100, pItemTransmogrifier->GetProto()->DisplayInfoID, "", 0);
+                                                transmogItems[transmogItemEntry] = transmogItem;
+                                                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, transmogItem->GetProto()->Name1, action + 100, transmogItemEntry, "", 0);
                                             }
                                         }
                                     }
@@ -440,14 +441,15 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                         // Check in the bank's main inventory
                         for (uint8 i = BANK_SLOT_ITEM_START; i < BANK_SLOT_ITEM_END; i++)
                         {
-                            if (Item* pItemTransmogrifier = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            if (Item* transmogItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                             {
-                                if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+								const uint32 transmogItemEntry = transmogItem->GetEntry();
+                                if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), transmogItem->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != transmogItemEntry)
                                 {
-                                    if (transmogItems.find(pItemTransmogrifier->GetProto()->DisplayInfoID) == transmogItems.end())
+                                    if (transmogItems.find(transmogItemEntry) == transmogItems.end())
                                     {
-                                        transmogItems[pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
-                                        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, pItemTransmogrifier->GetProto()->Name1, action + 100, pItemTransmogrifier->GetProto()->DisplayInfoID, "", 0);
+                                        transmogItems[transmogItemEntry] = transmogItem;
+                                        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, transmogItem->GetProto()->Name1, action + 100, transmogItemEntry, "", 0);
                                     }
                                 }
                             }
@@ -460,14 +462,15 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                             {
                                 for (uint32 j = 0; j < pBag->GetBagSize(); j++)
                                 {
-                                    if (Item* pItemTransmogrifier = pBag->GetItemByPos(static_cast<uint8>(j)))
+                                    if (Item* transmogItem = pBag->GetItemByPos(static_cast<uint8>(j)))
                                     {
-                                        if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), pItemTransmogrifier->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != pItemTransmogrifier->GetEntry())
+										const uint32 transmogItemEntry = transmogItem->GetEntry();
+                                        if (CanTransmogItemWithItem(player, pEquippedItem->GetProto(), transmogItem->GetProto()) && GetFakeEntry(pEquippedItem->GetObjectGuid()) != transmogItemEntry)
                                         {
-                                            if (transmogItems.find(pItemTransmogrifier->GetProto()->DisplayInfoID) == transmogItems.end())
+                                            if (transmogItems.find(transmogItemEntry) == transmogItems.end())
                                             {
-                                                transmogItems[pItemTransmogrifier->GetProto()->DisplayInfoID] = pItemTransmogrifier;
-                                                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, pItemTransmogrifier->GetProto()->Name1, action + 100, pItemTransmogrifier->GetProto()->DisplayInfoID, "", 0);
+                                                transmogItems[transmogItemEntry] = transmogItem;
+                                                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, transmogItem->GetProto()->Name1, action + 100, transmogItemEntry, "", 0);
                                             }
                                         }
                                     }
@@ -476,15 +479,15 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                         }
 
                         // Remove the transmog on the current item
+						bool hasTransmog = false;
                         bool hasTransmogOptions = !transmogItems.empty();
-                        bool hasTransmog = false;
-                        if (const uint32 FakeEntry = GetFakeEntry(EquippedItemGUID))
+                        if (const uint32 fakeEntry = GetFakeEntry(equippedItemGUID))
                         {
                             hasTransmog = true;
-                            if (ItemPrototype const* pItem = sObjectMgr.GetItemPrototype(FakeEntry))
+                            if (ItemPrototype const* pItem = sObjectMgr.GetItemPrototype(fakeEntry))
                             {
-                                const std::string item_name = pItem->Name1;
-                                const std::string illusion = playerSession->GetMangosString(LANG_MENU_REMOVE) + item_name;
+                                const std::string itemName = pItem->Name1;
+                                const std::string illusion = playerSession->GetMangosString(LANG_MENU_REMOVE) + itemName;
                                 player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, illusion.c_str(), EQUIPMENT_SLOT_END + 3, action, "", 0);
                             }
                         }
@@ -565,8 +568,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 					bool removed = false;
 					if (Item* pEquippedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, static_cast<uint8>(action)))
 					{
-						const ObjectGuid EquippedItemGUID = pEquippedItem->GetObjectGuid();
-						if (GetFakeEntry(EquippedItemGUID))
+						if (GetFakeEntry(pEquippedItem->GetObjectGuid()))
 						{
 							DeleteFakeEntry(player, static_cast<uint8>(action), pEquippedItem);
 							removed = true;
@@ -608,78 +610,65 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 
 				default:
 				{
-					// Check cost
-					if (sender >= 100)
+					// sender = target equipment slot, action = source item entry
+					Item* sourceItem = player->GetItemByEntry(action);
+                    Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, (uint8)(sender >= 100 ? sender - 100 : sender));
+					if (sourceItem)
 					{
-						// The cost is the vendor sell price of the transmog or 1 Gold
-						const uint64 playerID = player->GetObjectGuid();
-						if (Item* pItemTransmogrifier = transmogItems[action])
+						// Check cost
+						if (sender >= 100)
 						{
-							if (ItemPrototype const* protoItemTransmogrifier = pItemTransmogrifier->GetProto())
+							// Display transaction
+							if (!targetItem)
 							{
-								// Display transaction
-								Item* pItemTransmogrified = player->GetItemByPos(INVENTORY_SLOT_BAG_0, static_cast<uint8>(sender - 100));
-								if (!pItemTransmogrified)
-								{
-									OnPlayerGossipHello(player, creature);
-									return true;
-								}
-
-								if (ItemPrototype const* protoItemTransmogrified = pItemTransmogrified->GetProto())
-								{
-									std::string nameItemTransmogrified = protoItemTransmogrified->Name1;
-									std::string before = playerSession->GetMangosString(LANG_MENU_BEFORE) + nameItemTransmogrified;
-									player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, before.c_str(), sender, action, "", 0);
-								}
-
-								const uint32 price = GetTransmogItemPrice(pItemTransmogrified);
-								std::string nameItemTransmogrifier = protoItemTransmogrifier->Name1;
-								std::string after = playerSession->GetMangosString(LANG_MENU_AFTER) + nameItemTransmogrifier;
-								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, after.c_str(), sender, action, "", 0);
-
-								std::string s_cost;
-								s_cost = playerSession->GetMangosString(LANG_MENU_COST_IS) + FormatPrice(price);
-								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, s_cost.c_str(), sender, action, "", 0);
-
-								// Only show confirmation button if player has enough money
-								if (player->GetMoney() > price)
-								{
-									player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_MENU_CONFIRM), sender - 100, action, "", 0);
-								}
-								else
-								{
-									player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY), sender, action, "", 0);
-								}
-
-								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_BACK), EQUIPMENT_SLOT_END, pItemTransmogrified->GetSlot(), "", 0);
-								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_MAIN_MENU), EQUIPMENT_SLOT_END + 1, 0, "", 0);
-								player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_CONFIRM_NPC_TEXT, creature->GetObjectGuid());
+								OnPlayerGossipHello(player, creature);
+								return true;
 							}
-						}
-					}
-					else
-					{
-						const uint64 playerID = player->GetObjectGuid();
-						if (!transmogItems[action])
-							return true;
 
-						// sender = slot, action = display
-						TransmogLanguage res = TransmogItem(player, transmogItems[action]->GetObjectGuid(), (uint8)sender, false);
-						if (res == LANG_ERR_TRANSMOG_OK)
-						{
-							uint32 selfVisualSpell = 24085;
-							uint32 npcToPlayerSpell = 14867;
-							creature->CastSpell(player, npcToPlayerSpell, TRIGGERED_OLD_TRIGGERED);
-							player->CastSpell(player, selfVisualSpell, TRIGGERED_OLD_TRIGGERED);
-							playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_TRANSMOG_OK), GetSlotName((uint8)sender));
+							std::string nameItemTransmogrified = targetItem->GetProto()->Name1;
+							std::string before = playerSession->GetMangosString(LANG_MENU_BEFORE) + nameItemTransmogrified;
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, before.c_str(), sender, action, "", 0);
+
+							const uint32 price = GetTransmogItemPrice(targetItem);
+							std::string nameItemTransmogrifier = sourceItem->GetProto()->Name1;
+							std::string after = playerSession->GetMangosString(LANG_MENU_AFTER) + nameItemTransmogrifier;
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, after.c_str(), sender, action, "", 0);
+
+							std::string costStr;
+							costStr = playerSession->GetMangosString(LANG_MENU_COST_IS) + FormatPrice(price);
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, costStr.c_str(), sender, action, "", 0);
+
+							// Only show confirmation button if player has enough money
+							if (player->GetMoney() > price)
+							{
+								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_MENU_CONFIRM), sender - 100, action, "", 0);
+							}
+							else
+							{
+								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY), sender, action, "", 0);
+							}
+
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_BACK), EQUIPMENT_SLOT_END, targetItem->GetSlot(), "", 0);
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_MAIN_MENU), EQUIPMENT_SLOT_END + 1, 0, "", 0);
+							player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_CONFIRM_NPC_TEXT, creature->GetObjectGuid());
 						}
 						else
 						{
-							playerSession->SendNotification(res);
-						}
+							// sender = equipment slot, action = item entry
+							TransmogLanguage res = TransmogItem(player, sourceItem, targetItem);
+							if (res == LANG_ERR_TRANSMOG_OK)
+							{
+								creature->CastSpell(player, TRANSMOG_NPC_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
+								player->CastSpell(player, TRANSMOG_SELF_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
+								playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_TRANSMOG_OK), GetSlotName((uint8)sender));
+							}
+							else
+							{
+								playerSession->SendNotification(res);
+							}
 
-						transmogItems.clear();
-						OnPlayerGossipHello(player, creature);
+							OnPlayerGossipHello(player, creature);
+						}
 					}
 
 					break;
@@ -707,7 +696,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 			const ObjectGuid playerId = player->GetObjectGuid();
 
             player->GetPlayerMenu()->ClearMenus();
-            WorldSession* session = playerSession;
+            WorldSession* session = player->GetSession();
             switch (sender)
             {
 				// Show items you can use
@@ -1265,25 +1254,8 @@ void TransmogMgr::PresetTransmogItem(Player* player, Item* itemTransmogrified, u
     itemTransmogrified->SetOwnerGuid(player->GetObjectGuid());
 }
 
-TransmogLanguage TransmogMgr::TransmogItem(Player* player, ObjectGuid sourceItemGUID, uint8 targetItemSlot, bool noCost)
+TransmogLanguage TransmogMgr::TransmogItem(Player* player, Item* sourceItem, Item* targetItem)
 {
-    if (targetItemSlot >= EQUIPMENT_SLOT_END)
-    {
-        sLog.outError("TransmogItem wrong slot: %u", targetItemSlot);
-        return LANG_ERR_TRANSMOG_INVALID_SLOT;
-    }
-
-    Item* sourceItem = nullptr;
-    if (sourceItemGUID)
-    {
-        sourceItem = player->GetItemByGuid(sourceItemGUID);
-        if (!sourceItem)
-        {
-            return LANG_ERR_TRANSMOG_MISSING_SRC_ITEM;
-        }
-    }
-
-    Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, targetItemSlot);
     if (!targetItem)
     {
         return LANG_ERR_TRANSMOG_MISSING_DEST_ITEM;
@@ -1292,7 +1264,7 @@ TransmogLanguage TransmogMgr::TransmogItem(Player* player, ObjectGuid sourceItem
     if (!sourceItem) // reset look newEntry
     {
         // Custom
-        DeleteFakeEntry(player, targetItemSlot, targetItem);
+        DeleteFakeEntry(player, targetItem->GetSlot(), targetItem);
     }
     else
     {
@@ -1302,30 +1274,27 @@ TransmogLanguage TransmogMgr::TransmogItem(Player* player, ObjectGuid sourceItem
         if (GetFakeEntry(targetItem->GetObjectGuid()) == sourceItem->GetEntry())
             return LANG_ERR_TRANSMOG_SAME_DISPLAYID;
 
-        if (!noCost)
+        if (sTransmogConfig.tokenRequired)
         {
-            if (sTransmogConfig.tokenRequired)
-            {
-                if (player->HasItemCount(sTransmogConfig.tokenEntry, sTransmogConfig.tokenAmount))
-				{
-                    player->DestroyItemCount(sTransmogConfig.tokenEntry, sTransmogConfig.tokenAmount, true);
-				}
-                else
-				{
-                    return LANG_ERR_TRANSMOG_NOT_ENOUGH_TOKENS;
-				}
-            }
+            if (player->HasItemCount(sTransmogConfig.tokenEntry, sTransmogConfig.tokenAmount))
+			{
+                player->DestroyItemCount(sTransmogConfig.tokenEntry, sTransmogConfig.tokenAmount, true);
+			}
+            else
+			{
+                return LANG_ERR_TRANSMOG_NOT_ENOUGH_TOKENS;
+			}
+        }
 
-            const uint32 price = GetTransmogItemPrice(targetItem);
-            if (price)
-            {
-                if (player->GetMoney() < price)
-				{
-                    return LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY;
-				}
+        const uint32 price = GetTransmogItemPrice(targetItem);
+        if (price)
+        {
+            if (player->GetMoney() < price)
+			{
+                return LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY;
+			}
 
-                player->ModifyMoney(-(int)price);
-            }
+            player->ModifyMoney(-(int)price);
         }
 
         SetFakeEntry(player, sourceItem->GetEntry(), targetItem);
@@ -2035,12 +2004,12 @@ bool TransmogMgr::Refresh(Player* player, Item* pEquippedItem)
 	//if (const uint32 Transmogrifier = GetFakeEntry(EquippedItemGUID))
 	//{
 	//	// We need to search for the Transmogrifier in all the bags and bank
-	//	if (Item* pItemTransmogrifier = player->GetItemByEntry(Transmogrifier))
+	//	if (Item* transmogItem = player->GetItemByEntry(Transmogrifier))
 	//	{
 	//		const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//		if (player->GetUInt32Value(VisibleBase + 0) != pItemTransmogrifier->GetEntry())
+	//		if (player->GetUInt32Value(VisibleBase + 0) != transmogItem->GetEntry())
 	//		{
-	//			player->SetVisibleItemSlot(slot, pItemTransmogrifier);
+	//			player->SetVisibleItemSlot(slot, transmogItem);
 	//			ok = true;
 	//		}
 	//	}
@@ -2120,12 +2089,12 @@ bool TransmogMgr::ApplyAll(Player* player)
 	//		if (const uint32 Transmogrifier = GetFakeEntry(EquippedItemGUID))
 	//		{
 	//			// We need to search for the Transmogrifier in all the bags and bank
-	//			if (Item* pItemTransmogrifier = player->GetItemByEntry(Transmogrifier))
+	//			if (Item* transmogItem = player->GetItemByEntry(Transmogrifier))
 	//			{
 	//				const uint16 VisibleBase = PLAYER_VISIBLE_ITEM_1_0 + slot * MAX_VISIBLE_ITEM_OFFSET;
-	//				if (player->GetUInt32Value(VisibleBase + 0) != pItemTransmogrifier->GetEntry())
+	//				if (player->GetUInt32Value(VisibleBase + 0) != transmogItem->GetEntry())
 	//				{
-	//					player->SetVisibleItemSlot(slot, pItemTransmogrifier);
+	//					player->SetVisibleItemSlot(slot, transmogItem);
 	//					ok = true;
 	//				}
 	//			}

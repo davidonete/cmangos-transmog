@@ -78,7 +78,7 @@ private:
     void ShowTransmogItems(Player* player, Creature* creature, uint8 slot);
     void UpdateTransmogItem(Player* player, Item* item) const;
     void PresetTransmogItem(Player* player, Item* itemTransmogrified, uint32 fakeEntry, uint8 slot);
-    TransmogLanguage TransmogItem(Player* player, ObjectGuid sourceItemGUID, uint8 targetItemSlot, bool noCost);
+    TransmogLanguage TransmogItem(Player* player, Item* sourceItem, Item* targetItem);
 
     uint32 GetFakeEntry(const ObjectGuid& itemGUID) const;
     void SetFakeEntry(Player* player, uint32 newEntry, Item* itemTransmogrified);
