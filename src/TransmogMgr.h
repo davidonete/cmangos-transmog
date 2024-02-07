@@ -64,14 +64,14 @@ public:
     void Init();
 
     // Player hooks
+    void OnPlayerLogin(Player* player);
     void OnPlayerLogout(Player* player);
     bool OnPlayerGossipHello(Player* player, Creature* creature);
     bool OnPlayerGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action);
+    void OnPlayerSetVisibleItemSlot(Player* player, uint8 slot, Item* item);
+    void OnPlayerMoveItemFromInventory(Player* player, Item* item);
 
 private:
-    void LoadPlayerPresets(Player* player);
-    void UnloadPlayerPresets(Player* player);
-
     bool CanTransmogItemWithItem(Player* player, const ItemPrototype* target, const ItemPrototype* source) const;
     bool SuitableForTransmog(Player* player, const ItemPrototype* proto) const;
 
