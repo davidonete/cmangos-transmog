@@ -573,14 +573,18 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 					TransmogLanguage res = TransmogItem(player, ObjectGuid(HIGHGUID_ITEM, action), sender, false);
 					if (res == LANG_ERR_TRANSMOG_OK)
 					{
-						session->SendAreaTriggerMessage("%s", LANG_ERR_TRANSMOG_OK);
+                        constexpr uint32 selfVisualSpell = 24085;
+						constexpr uint32 npcToPlayerSpell = 14867;
+                        creature->CastSpell(player, npcToPlayerSpell, TRIGGERED_OLD_TRIGGERED);
+                        player->CastSpell(player, selfVisualSpell, TRIGGERED_OLD_TRIGGERED);
+                        session->SendAreaTriggerMessage("%s (%s)", session->GetMangosString(LANG_ERR_TRANSMOG_OK), GetSlotName((uint8)sender));
 					}
 					else
 					{
 						session->SendNotification(res);
 					}
 
-					player->GetPlayerMenu()->CloseGossip();
+					OnPlayerGossipHello(player, creature);
 					break;
 				} 
             }
