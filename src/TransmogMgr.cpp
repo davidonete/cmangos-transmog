@@ -625,7 +625,11 @@ void TransmogMgr::OnPlayerSetVisibleItemSlot(Player* player, uint8 slot, Item* i
 		{
             if (uint32 entry = GetFakeEntry(item))
 			{
+#ifdef EXPANSION == 2
+                player->SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + item->GetSlot() * 2, entry);
+#else
                 player->SetUInt32Value(PLAYER_VISIBLE_ITEM_1_0 + item->GetSlot() * MAX_VISIBLE_ITEM_OFFSET, entry);
+#endif
 			}
 		}
 	}
