@@ -71,6 +71,20 @@ const char* GetSlotName(uint8 slot)
     }
 }
 
+uint32 GetTransmogItemPrice(const Item* item)
+{
+    uint32 price = 0U;
+    if (item)
+    {
+        const ItemPrototype* proto = item->GetProto();
+        price = proto->SellPrice ? proto->SellPrice : 100U;
+        price += sTransmogConfig.costFee;
+        price *= sTransmogConfig.costMultiplier;
+    }
+
+    return price;
+}
+
 bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
 {
     if (sTransmogConfig.enabled)
@@ -666,20 +680,6 @@ bool TransmogMgr::SuitableForTransmog(Player* player, const ItemPrototype* proto
         return false;
 
     return true;
-}
-
-uint32 GetTransmogItemPrice(const Item* item)
-{
-	uint32 price = 0U;
-	if (item)
-	{
-		const ItemPrototype* proto = item->GetProto();
-		price = proto->SellPrice ? proto->SellPrice : 100U;
-		price += sTransmogConfig.costFee;
-		price *= sTransmogConfig.costMultiplier;
-	}
-
-    return price;
 }
 
 std::string GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y)

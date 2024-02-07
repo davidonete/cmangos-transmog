@@ -31,7 +31,7 @@ bool TransmogConfig::Initialize()
 
     enabled = config.GetBoolDefault("Transmog.Enable", false);
     presetsEnabled = config.GetBoolDefault("Transmog.Presets", false);
-    maxPresets = config.GetBoolDefault("Transmog.MaxPresets", 10U);
+    maxPresets = config.GetIntDefault("Transmog.MaxPresets", 10U);
     costMultiplier = config.GetFloatDefault("Transmog.CostMultiplier", 1.0f);
     costFee = config.GetIntDefault("Transmog.CostFee", 0U);
     tokenRequired = config.GetBoolDefault("Transmog.TokenRequired", false);
