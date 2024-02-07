@@ -1,6 +1,8 @@
 # Transmog Mod
 Mode to allow changing your equipped item appearances with ones in your bags or banks. This tries to simulate the transmog feature introduced in Cataclysm, with the exception that only items in your posession can be used (not every item you ever collected).
 
+The transmog npc will be located in Stormwind Mage Tower and in Orgrimmar Valley of Spirits.
+
 # How to install
 NOTE: This guide assumes that you have basic knowledge on how to generate c++ projects, compile code and modify a database
 
