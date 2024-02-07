@@ -1,8 +1,13 @@
 #ifndef MANGOS_TRANSMOG_MGR_H
 #define MANGOS_TRANSMOG_MGR_H
 
-#include <unordered_map>
+#include "Entities/ObjectGuid.h"
+#include "Platform/Define.h"
 
+#include <unordered_map>
+#include <map>
+
+class Creature;
 class Item;
 class Player;
 
