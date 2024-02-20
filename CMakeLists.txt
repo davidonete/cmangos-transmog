@@ -16,11 +16,11 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-set(LIBRARY_NAME Transmog)
+set(LIBRARY_NAME transmog)
 
 #Base files
 file(GLOB transmog_source ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h)
-    source_group("Transmog" FILES ${transmog_source})
+    source_group("transmog" FILES ${transmog_source})
 
 #Define base source library
 set(LIBRARY_SRCS ${transmog_source})
