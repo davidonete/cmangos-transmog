@@ -4,6 +4,16 @@
 #include "Entities/Player.h"
 #include "Globals/ObjectMgr.h"
 
+std::string FormatStringParams(const char* format, ...)
+{
+    va_list ap;
+    char out[2048];
+    va_start(ap, format);
+    vsnprintf(out, 2048, format, ap);
+    va_end(ap);
+    return std::string(out);
+}
+
 void TransmogModule::OnInitialize()
 {
 	if (GetConfig()->enabled)
@@ -83,24 +93,25 @@ void TransmogModule::OnDeleteFromDB(uint32 playerId)
 	}
 }
 
-const char* GetSlotName(uint8 slot)
+const char* GetSlotName(uint8 slot, Player* player)
 {
+    
     switch (slot)
     {
-		case EQUIPMENT_SLOT_HEAD: return "Head";
-		case EQUIPMENT_SLOT_SHOULDERS: return "Shoulders";
-		case EQUIPMENT_SLOT_BODY: return "Shirt";
-		case EQUIPMENT_SLOT_CHEST: return "Chest";
-		case EQUIPMENT_SLOT_WAIST: return "Waist";
-		case EQUIPMENT_SLOT_LEGS: return "Legs";
-		case EQUIPMENT_SLOT_FEET: return "Feet";
-		case EQUIPMENT_SLOT_WRISTS: return "Wrists";
-		case EQUIPMENT_SLOT_HANDS: return "Hands";
-		case EQUIPMENT_SLOT_BACK: return "Back";
-		case EQUIPMENT_SLOT_MAINHAND: return "Main hand";
-		case EQUIPMENT_SLOT_OFFHAND: return "Off hand";
-		case EQUIPMENT_SLOT_RANGED: return "Ranged";
-		case EQUIPMENT_SLOT_TABARD: return "Tabard";
+		case EQUIPMENT_SLOT_HEAD: return player->GetSession()->GetMangosString(LANG_MENU_HEAD);
+		case EQUIPMENT_SLOT_SHOULDERS: return player->GetSession()->GetMangosString(LANG_MENU_SHOULDERS);
+		case EQUIPMENT_SLOT_BODY: return player->GetSession()->GetMangosString(LANG_MENU_SHIRT);
+		case EQUIPMENT_SLOT_CHEST: return player->GetSession()->GetMangosString(LANG_MENU_CHEST);
+		case EQUIPMENT_SLOT_WAIST: return player->GetSession()->GetMangosString(LANG_MENU_WAIST);
+		case EQUIPMENT_SLOT_LEGS: return player->GetSession()->GetMangosString(LANG_MENU_LEGS);
+		case EQUIPMENT_SLOT_FEET: return player->GetSession()->GetMangosString(LANG_MENU_FEET);
+		case EQUIPMENT_SLOT_WRISTS: return player->GetSession()->GetMangosString(LANG_MENU_WRISTS);
+		case EQUIPMENT_SLOT_HANDS: return player->GetSession()->GetMangosString(LANG_MENU_HANDS);
+		case EQUIPMENT_SLOT_BACK: return player->GetSession()->GetMangosString(LANG_MENU_BACK);
+		case EQUIPMENT_SLOT_MAINHAND: return player->GetSession()->GetMangosString(LANG_MENU_MAIN_HAND);
+		case EQUIPMENT_SLOT_OFFHAND: return player->GetSession()->GetMangosString(LANG_MENU_OFF_HAND);
+		case EQUIPMENT_SLOT_RANGED: return player->GetSession()->GetMangosString(LANG_MENU_RANGED);
+		case EQUIPMENT_SLOT_TABARD: return player->GetSession()->GetMangosString(LANG_MENU_TABARD);
 		default: return nullptr;
     }
 }
@@ -167,7 +178,9 @@ bool TransmogModule::OnPreGossipHello(Player* player, Creature* creature)
 				return false;
 
             player->GetPlayerMenu()->ClearMenus();
-			player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "How does transmogrification work?", EQUIPMENT_SLOT_END + 9, 0, "", 0);
+
+            const std::string howDoesItWorkStr = player->GetSession()->GetMangosString(LANG_MENU_HOW);
+			player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, howDoesItWorkStr, EQUIPMENT_SLOT_END + 9, 0, "", 0);
 
             // Only show the menu option for items that you have equipped
             for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; slot++)
@@ -287,18 +300,21 @@ bool TransmogModule::OnPreGossipHello(Player* player, Creature* creature)
 
                     if (hasOption)
                     {
-                        std::string slotName = GetSlotName(slot);
+                        const std::string slotName = GetSlotName(slot, player);
                         if (slotName.length() > 0)
 						{
-                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, slotName.c_str(), EQUIPMENT_SLOT_END, slot, "", 0);
+                            const std::string transmogStr = player->GetSession()->GetMangosString(LANG_MENU_TRANSMOGRIFY);
+                            const std::string transmogSlotStr = FormatStringParams(transmogStr.c_str(), slotName.c_str());
+                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, transmogSlotStr, EQUIPMENT_SLOT_END, slot, "", 0);
 						}
                     }
                 }
             }
 
             // Remove all transmogrifiers
-            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, "Remove all transmogrifications.", EQUIPMENT_SLOT_END + 2, 0, "", 0);
-            player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+            const std::string removeAllStr = player->GetSession()->GetMangosString(LANG_MENU_REMOVE_ALL);
+            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, removeAllStr, EQUIPMENT_SLOT_END + 2, 0, "", 0);
+            player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_INFO_NPC_TEXT, creature->GetObjectGuid());
             return true;
 		}
 	}
@@ -435,7 +451,7 @@ bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 s
                             }
                         }
 
-                        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_BACK), EQUIPMENT_SLOT_END + 1, 0, "", 0);
+                        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_GO_BACK), EQUIPMENT_SLOT_END + 1, 0, "", 0);
                         if (hasTransmog && !hasTransmogOptions)
                         {
                             player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_ALREADY_NPC_TEXT, creature->GetObjectGuid());
@@ -508,7 +524,7 @@ bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 s
 						}
 					}
 
-					const std::string slotName = GetSlotName((uint8)action);
+					const std::string slotName = GetSlotName((uint8)action, player);
 					if (removed)
 					{
 						playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_UNTRANSMOG_SINGLE_OK), slotName.c_str());
@@ -536,7 +552,7 @@ bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 s
 				// Info about transmogrification
 				case EQUIPMENT_SLOT_END + 9:
 				{
-					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, playerSession->GetMangosString(LANG_MENU_BACK), EQUIPMENT_SLOT_END + 1, 0, "", 0);
+					player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, playerSession->GetMangosString(LANG_MENU_GO_BACK), EQUIPMENT_SLOT_END + 1, 0, "", 0);
 					player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_INFO_NPC_TEXT, creature->GetObjectGuid());
 					break;
 				}
@@ -580,7 +596,7 @@ bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 s
 								player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY), sender, action, "", 0);
 							}
 
-							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_BACK), EQUIPMENT_SLOT_END, targetItem->GetSlot(), "", 0);
+							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_GO_BACK), EQUIPMENT_SLOT_END, targetItem->GetSlot(), "", 0);
 							player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_MAIN_MENU), EQUIPMENT_SLOT_END + 1, 0, "", 0);
 							player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_CONFIRM_NPC_TEXT, creature->GetObjectGuid());
 						}
@@ -592,7 +608,7 @@ bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 s
 							{
 								creature->CastSpell(player, TRANSMOG_NPC_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
 								player->CastSpell(player, TRANSMOG_SELF_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-								playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_TRANSMOG_OK), GetSlotName((uint8)sender));
+								playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_TRANSMOG_OK), GetSlotName((uint8)sender, player));
 							}
 							else
 							{

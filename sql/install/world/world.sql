@@ -31,7 +31,7 @@ INSERT INTO `locales_npc_text` (`entry`, `text0_0_loc6`) VALUES
 
 SET @STRING_ENTRY := 11100;
 
-DELETE FROM `mangos_string` WHERE `entry` BETWEEN  @STRING_ENTRY+0 AND @STRING_ENTRY+29;
+DELETE FROM `mangos_string` WHERE `entry` BETWEEN  @STRING_ENTRY+0 AND @STRING_ENTRY+46;
 INSERT INTO `mangos_string` (`entry`, `content_default`, `content_loc6`) VALUES
 (@STRING_ENTRY+0, 'Item successfully transmogrified.', 'Objeto transfigurado con éxito.'),
 (@STRING_ENTRY+1, 'Equipment slot is empty.', 'La ranura del equipo está vacía.'),
@@ -60,6 +60,23 @@ INSERT INTO `mangos_string` (`entry`, `content_default`, `content_loc6`) VALUES
 (@STRING_ENTRY+24, 'Cost is ', 'El precio es '),
 (@STRING_ENTRY+25, 'Confirm', 'Confirmar'),
 (@STRING_ENTRY+26, 'Your item: ', 'Tu objeto: '),
-(@STRING_ENTRY+27, 'Transmog: ', 'Transmodificación'),
-(@STRING_ENTRY+28, 'Possible transmogrifications:', 'Posible transmodificaciónes:'),
-(@STRING_ENTRY+29, 'Options:', 'Opciones:');
+(@STRING_ENTRY+27, 'Transmog: ', 'Transfiguración'),
+(@STRING_ENTRY+28, 'Possible transmogrifications:', 'Posible transfiguraciones:'),
+(@STRING_ENTRY+29, 'Options:', 'Opciones:'),
+(@STRING_ENTRY+30, 'How does transmogrification work?:', '¿Como funciona la transfiguración?'),
+(@STRING_ENTRY+31, 'Head', 'Cabeza'),
+(@STRING_ENTRY+32, 'Shoulders', 'Hombros'),
+(@STRING_ENTRY+33, 'Shirt', 'Camisa'),
+(@STRING_ENTRY+34, 'Chest', 'Pecho'),
+(@STRING_ENTRY+35, 'Waist', 'Cintura'),
+(@STRING_ENTRY+36, 'Legs', 'Piernas'),
+(@STRING_ENTRY+37, 'Feet', 'Pies'),
+(@STRING_ENTRY+38, 'Wrists', 'Muñeca'),
+(@STRING_ENTRY+39, 'Hands', 'Manos'),
+(@STRING_ENTRY+40, 'Back', 'Espalda'),
+(@STRING_ENTRY+41, 'Main Hand', 'Mano Principal'),
+(@STRING_ENTRY+42, 'Off Hand', 'Mano Secundaria'),
+(@STRING_ENTRY+43, 'Ranged', 'A Distancia'),
+(@STRING_ENTRY+44, 'Tabard', 'Tabardo'),
+(@STRING_ENTRY+45, 'Remove all transmogrifications', 'Quitar todas las transfiguraciones'),
+(@STRING_ENTRY+46, 'Transmogrify %s', 'Transfigurar %s');
