@@ -1,24 +1,21 @@
-#include "TransmogMgr.h"
-#include "TransmogConfig.h"
+#include "TransmogModule.h"
 
 #include "Entities/GossipDef.h"
 #include "Entities/Player.h"
 #include "Globals/ObjectMgr.h"
 
-void TransmogMgr::Init()
+void TransmogModule::OnInitialize()
 {
-	sTransmogConfig.Initialize();
-
-	if (sTransmogConfig.enabled)
+	if (GetConfig()->enabled)
 	{
 		// Delete corrupted transmog config
 		CharacterDatabase.Execute("DELETE FROM custom_transmogrification WHERE NOT EXISTS (SELECT 1 FROM item_instance WHERE item_instance.guid = custom_transmogrification.GUID)");
 	}
 }
 
-void TransmogMgr::OnPlayerLogin(Player* player)
+void TransmogModule::OnLoadFromDB(Player* player)
 {
-    if (sTransmogConfig.enabled)
+    if (GetConfig()->enabled)
     {
 		if (player)
 		{
@@ -60,9 +57,9 @@ void TransmogMgr::OnPlayerLogin(Player* player)
 	}
 }
 
-void TransmogMgr::OnPlayerLogout(Player* player)
+void TransmogModule::OnLogOut(Player* player)
 {
-	if (sTransmogConfig.enabled)
+	if (GetConfig()->enabled)
 	{
         if (player)
         {
@@ -78,9 +75,9 @@ void TransmogMgr::OnPlayerLogout(Player* player)
 	}
 }
 
-void TransmogMgr::OnPlayerCharacterDeletedFromDB(uint32 playerId)
+void TransmogModule::OnDeleteFromDB(uint32 playerId)
 {
-    if (sTransmogConfig.enabled)
+    if (GetConfig()->enabled)
     {
 		CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE Owner = %u", playerId);
 	}
@@ -108,15 +105,15 @@ const char* GetSlotName(uint8 slot)
     }
 }
 
-uint32 TransmogMgr::GetTransmogPrice(const Item* item) const
+uint32 TransmogModule::GetTransmogPrice(const Item* item) const
 {
     uint32 price = 0U;
     if (item)
     {
         const ItemPrototype* proto = item->GetProto();
         price = proto->SellPrice ? proto->SellPrice : 100U;
-        price += sTransmogConfig.costFee;
-        price *= sTransmogConfig.costMultiplier;
+        price += GetConfig()->costFee;
+        price *= GetConfig()->costMultiplier;
     }
 
     return price;
@@ -159,9 +156,9 @@ std::string FormatPrice(uint32 copper)
     return out.str();
 }
 
-bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
+bool TransmogModule::OnPreGossipHello(Player* player, Creature* creature)
 {
-    if (sTransmogConfig.enabled)
+    if (GetConfig()->enabled)
     {
         if (player && creature)
         {
@@ -309,9 +306,9 @@ bool TransmogMgr::OnPlayerGossipHello(Player* player, Creature* creature)
 	return false;
 }
 
-bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
+bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action, const std::string& code, uint32 gossipListId)
 {
-    if (sTransmogConfig.enabled)
+    if (GetConfig()->enabled)
     {
         if (player && creature)
         {
@@ -433,7 +430,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                             if (possibleTransmogItems.empty())
                             {
                                 playerSession->SendAreaTriggerMessage(playerSession->GetMangosString(LANG_MENU_NO_SUITABLE_ITEMS));
-                                OnPlayerGossipHello(player, creature);
+                                OnPreGossipHello(player, creature);
                                 return true;
                             }
                         }
@@ -454,7 +451,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
                     }
                     else
                     {
-                        OnPlayerGossipHello(player, creature);
+                        OnPreGossipHello(player, creature);
                     }
 
                     break;
@@ -463,7 +460,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 				// Go back to main menu
 				case EQUIPMENT_SLOT_END + 1:
 				{
-					OnPlayerGossipHello(player, creature);
+					OnPreGossipHello(player, creature);
 					break;
 				}
 
@@ -494,7 +491,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 						playerSession->SendNotification(LANG_ERR_UNTRANSMOG_NO_TRANSMOGS);
 					}
 
-					OnPlayerGossipHello(player, creature);
+					OnPreGossipHello(player, creature);
 					break;
 				}
 
@@ -523,7 +520,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 						playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_UNTRANSMOG_SINGLE_NO_TRANSMOGS), slotName.c_str());
 					}
 
-					OnPlayerGossipHello(player, creature);
+					OnPreGossipHello(player, creature);
 					break;
 				}
 
@@ -532,7 +529,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 				{
 					//ApplyAll(player);
 					playerSession->SendAreaTriggerMessage("Your appearance was refreshed");
-					OnPlayerGossipHello(player, creature);
+					OnPreGossipHello(player, creature);
 					break;
 				}
 
@@ -557,7 +554,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 							// Display transaction
 							if (!targetItem)
 							{
-								OnPlayerGossipHello(player, creature);
+								OnPreGossipHello(player, creature);
 								return true;
 							}
 
@@ -602,7 +599,7 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
 								playerSession->SendNotification(res);
 							}
 
-							OnPlayerGossipHello(player, creature);
+							OnPreGossipHello(player, creature);
 						}
 					}
 
@@ -617,9 +614,9 @@ bool TransmogMgr::OnPlayerGossipSelect(Player* player, Creature* creature, uint3
     return false;
 }
 
-void TransmogMgr::OnPlayerSetVisibleItemSlot(Player* player, uint8 slot, Item* item)
+void TransmogModule::OnSetVisibleItemSlot(Player* player, uint8 slot, Item* item)
 {
-	if (sTransmogConfig.enabled)
+	if (GetConfig()->enabled)
 	{
 		if (player && item)
 		{
@@ -635,9 +632,9 @@ void TransmogMgr::OnPlayerSetVisibleItemSlot(Player* player, uint8 slot, Item* i
 	}
 }
 
-void TransmogMgr::OnPlayerMoveItemFromInventory(Player* player, Item* item)
+void TransmogModule::OnMoveItemFromInventory(Player* player, Item* item)
 {
-    if (sTransmogConfig.enabled)
+    if (GetConfig()->enabled)
     {
         if (player && item)
         {
@@ -654,7 +651,7 @@ bool IsRangedWeapon(uint32 Class, uint32 SubClass)
             SubClass == ITEM_SUBCLASS_WEAPON_CROSSBOW);
 }
 
-bool TransmogMgr::CanApplyTransmog(Player* player, const Item* target, const Item* source) const
+bool TransmogModule::CanApplyTransmog(Player* player, const Item* target, const Item* source) const
 {
     if (!target || !source)
         return false;
@@ -733,7 +730,7 @@ bool TransmogMgr::CanApplyTransmog(Player* player, const Item* target, const Ite
     return true;
 }
 
-bool TransmogMgr::SuitableForTransmog(Player* player, const Item* item) const
+bool TransmogModule::SuitableForTransmog(Player* player, const Item* item) const
 {
     if (!player || !item)
         return false;
@@ -825,7 +822,7 @@ std::string GetItemLink(uint32 entry, WorldSession* session)
 	return oss.str();
 }
 
-void TransmogMgr::ShowTransmogItems(Player* player, Creature* creature, uint8 slot)
+void TransmogModule::ShowTransmogItems(Player* player, Creature* creature, uint8 slot)
 {
     WorldSession* session = player->GetSession();
     Item* oldItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
@@ -836,9 +833,9 @@ void TransmogMgr::ShowTransmogItems(Player* player, Creature* creature, uint8 sl
 
         std::ostringstream ss;
         ss << std::endl;
-        if (sTransmogConfig.tokenRequired)
+        if (GetConfig()->tokenRequired)
 		{
-            ss << std::endl << std::endl << sTransmogConfig.tokenAmount << " x " << GetItemLink(sTransmogConfig.tokenEntry, session);
+            ss << std::endl << std::endl << GetConfig()->tokenAmount << " x " << GetItemLink(GetConfig()->tokenEntry, session);
 		}
 
         for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
@@ -900,7 +897,7 @@ void TransmogMgr::ShowTransmogItems(Player* player, Creature* creature, uint8 sl
     player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
 }
 
-void TransmogMgr::UpdateTransmogItem(Player* player, Item* item) const
+void TransmogModule::UpdateTransmogItem(Player* player, Item* item) const
 {
     if (item->IsEquipped())
 	{
@@ -908,7 +905,7 @@ void TransmogMgr::UpdateTransmogItem(Player* player, Item* item) const
 	}
 }
 
-TransmogLanguage TransmogMgr::ApplyTransmog(Player* player, Item* sourceItem, Item* targetItem)
+TransmogLanguage TransmogModule::ApplyTransmog(Player* player, Item* sourceItem, Item* targetItem)
 {
     if (!targetItem)
     {
@@ -929,11 +926,11 @@ TransmogLanguage TransmogMgr::ApplyTransmog(Player* player, Item* sourceItem, It
         if (GetFakeEntry(targetItem) == sourceItem->GetEntry())
             return LANG_ERR_TRANSMOG_SAME_DISPLAYID;
 
-        if (sTransmogConfig.tokenRequired)
+        if (GetConfig()->tokenRequired)
         {
-            if (player->HasItemCount(sTransmogConfig.tokenEntry, sTransmogConfig.tokenAmount))
+            if (player->HasItemCount(GetConfig()->tokenEntry, GetConfig()->tokenAmount))
 			{
-                player->DestroyItemCount(sTransmogConfig.tokenEntry, sTransmogConfig.tokenAmount, true);
+                player->DestroyItemCount(GetConfig()->tokenEntry, GetConfig()->tokenAmount, true);
 			}
             else
 			{
@@ -966,7 +963,7 @@ TransmogLanguage TransmogMgr::ApplyTransmog(Player* player, Item* sourceItem, It
     return LANG_ERR_TRANSMOG_OK;
 }
 
-uint32 TransmogMgr::GetFakeEntry(Item* item) const
+uint32 TransmogModule::GetFakeEntry(Item* item) const
 {	
 	if (item)
 	{
@@ -983,7 +980,7 @@ uint32 TransmogMgr::GetFakeEntry(Item* item) const
 	return 0;
 }
 
-void TransmogMgr::SetFakeEntry(Player* player, uint32 newEntry, Item* item)
+void TransmogModule::SetFakeEntry(Player* player, uint32 newEntry, Item* item)
 {
 	if (item)
 	{
@@ -995,13 +992,13 @@ void TransmogMgr::SetFakeEntry(Player* player, uint32 newEntry, Item* item)
 	}
 }
 
-void TransmogMgr::DeleteFakeEntry(Player* player, uint8, Item* item)
+void TransmogModule::DeleteFakeEntry(Player* player, uint8, Item* item)
 {
     DeleteFakeEntryFromDB(item);
     UpdateTransmogItem(player, item);
 }
 
-void TransmogMgr::DeleteFakeEntryFromDB(Item* item)
+void TransmogModule::DeleteFakeEntryFromDB(Item* item)
 {
 	if (item)
 	{

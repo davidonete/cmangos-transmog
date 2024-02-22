@@ -1,11 +1,10 @@
-#include "TransmogConfig.h"
-
+#include "TransmogModuleConfig.h"
 #include "Globals/ObjectMgr.h"
 #include "Log.h"
-#include "SystemConfig.h"
 
-TransmogConfig::TransmogConfig()
-: enabled(false)
+TransmogModuleConfig::TransmogModuleConfig()
+: ModuleConfig("transmog.conf")
+, enabled(false)
 , costMultiplier(1.0f)
 , costFee(0U)
 , tokenRequired(false)
@@ -15,18 +14,8 @@ TransmogConfig::TransmogConfig()
     
 }
 
-INSTANTIATE_SINGLETON_1(TransmogConfig);
-
-bool TransmogConfig::Initialize()
+bool TransmogModuleConfig::OnLoad()
 {
-    sLog.outString("Initializing Transmog");
-
-    if (!config.SetSource(SYSCONFDIR"transmog.conf"))
-    {
-        sLog.outError("Failed to open configuration file transmog.conf");
-        return false;
-    }
-
     enabled = config.GetBoolDefault("Transmog.Enable", false);
     costMultiplier = config.GetFloatDefault("Transmog.CostMultiplier", 1.0f);
     costFee = config.GetIntDefault("Transmog.CostFee", 0U);
@@ -46,6 +35,5 @@ bool TransmogConfig::Initialize()
         tokenAmount = 1;
     }
 
-    sLog.outString("Transmog configuration loaded");
     return true;
 }
