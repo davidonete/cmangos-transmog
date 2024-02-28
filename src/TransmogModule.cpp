@@ -16,6 +16,33 @@ namespace transmog_module
         return std::string(out);
     }
 
+    Item* GetItemByEntry(Player* player, uint32 item)
+    {
+        for (int i = EQUIPMENT_SLOT_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+        {
+            if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+            {
+                if (pItem->GetEntry() == item)
+                {
+                    return pItem;
+                }
+            }
+        }
+
+        for (int i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
+        {
+            if (Bag* pBag = (Bag*)player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+            {
+                if (Item* itemPtr = pBag->GetItemByEntry(item))
+                {
+                    return itemPtr;
+                }
+            }
+        }
+
+        return nullptr;
+    }
+
     void TransmogModule::OnInitialize()
     {
 	    if (GetConfig()->enabled)
@@ -562,7 +589,7 @@ namespace transmog_module
 				    default:
 				    {
 					    // sender = target equipment slot, action = source item entry
-					    Item* sourceItem = player->GetItemByEntry(action);
+					    Item* sourceItem = GetItemByEntry(player, action);
                         Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, (uint8)(sender >= 100 ? sender - 100 : sender));
 					    if (sourceItem)
 					    {
