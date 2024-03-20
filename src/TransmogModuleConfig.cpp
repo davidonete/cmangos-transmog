@@ -1,6 +1,6 @@
 #include "TransmogModuleConfig.h"
 #include "Globals/ObjectMgr.h"
-#include "Log.h"
+#include "Log/Log.h"
 
 TransmogModuleConfig::TransmogModuleConfig()
 : ModuleConfig("transmog.conf")
