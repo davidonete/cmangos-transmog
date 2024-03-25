@@ -1,7 +1,7 @@
 #ifndef MANGOS_TRANSMOG_MODULE_H
 #define MANGOS_TRANSMOG_MODULE_H
 
-#include "Module.h"
+#include "../../modules/src/Module.h"
 #include "TransmogModuleConfig.h"
 
 #include <unordered_map>
