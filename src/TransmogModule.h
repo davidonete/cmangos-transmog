@@ -49,7 +49,5 @@ namespace transmog_module
         TransmogMap entryMap;
         TransmogData dataMap;
     };
-
-    static TransmogModule transmogModule;
 }
 #endif
