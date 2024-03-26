@@ -50,6 +50,7 @@ endif()
 add_library(${LIBRARY_NAME} STATIC ${LIBRARY_SRCS})
 
 target_link_libraries(${LIBRARY_NAME}
+	modules
 	shared
 	RecastNavigation::Detour
 )
