@@ -1,7 +1,7 @@
 #ifndef MANGOS_TRANSMOG_MODULE_H
 #define MANGOS_TRANSMOG_MODULE_H
 
-#include "Module.h"
+#include "CmangosModule.h"
 #include "TransmogModuleConfig.h"
 
 #include <unordered_map>
@@ -13,10 +13,10 @@ namespace transmog_module
     typedef std::unordered_map<ObjectGuid, Transmog2Data> TransmogMap;
     typedef std::unordered_map<ObjectGuid, ObjectGuid> TransmogData;
 
-    class TransmogModule : public Module
+    class TransmogModule : public CmangosModule
     {
     public:
-        TransmogModule() : Module("Transmog") {}
+        TransmogModule() : CmangosModule("Transmog") {}
         TransmogModuleConfig* CreateConfig() override { return new TransmogModuleConfig(); }
         const TransmogModuleConfig* GetConfig() const override { return (TransmogModuleConfig*)GetConfigInternal(); }
 

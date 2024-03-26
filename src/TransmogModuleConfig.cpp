@@ -3,7 +3,7 @@
 #include "Log/Log.h"
 
 TransmogModuleConfig::TransmogModuleConfig()
-: ModuleConfig("transmog.conf")
+: CmangosModuleConfig("transmog.conf")
 , enabled(false)
 , costMultiplier(1.0f)
 , costFee(0U)

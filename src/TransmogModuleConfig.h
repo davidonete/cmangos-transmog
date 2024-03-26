@@ -1,5 +1,5 @@
 #pragma once
-#include "ModuleConfig.h"
+#include "CmangosModuleConfig.h"
 
 #define MAX_OPTIONS 25
 
@@ -68,7 +68,7 @@ enum TransmogLanguage
     LANG_MENU_TRANSMOGRIFY
 };
 
-class TransmogModuleConfig : public ModuleConfig
+class TransmogModuleConfig : public CmangosModuleConfig
 {
 public:
     TransmogModuleConfig();
