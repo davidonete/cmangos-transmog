@@ -4,43 +4,17 @@
 #include "Entities/Player.h"
 #include "Globals/ObjectMgr.h"
 
-namespace transmog_module
+namespace cmangos_module
 {
-    std::string FormatString(const char* format, ...)
+    TransmogModule::TransmogModule()
+    : Module("Transmog", new TransmogModuleConfig())
     {
-        va_list ap;
-        char out[2048];
-        va_start(ap, format);
-        vsnprintf(out, 2048, format, ap);
-        va_end(ap);
-        return std::string(out);
+
     }
 
-    Item* GetItemByEntry(Player* player, uint32 item)
+    const cmangos_module::TransmogModuleConfig* TransmogModule::GetConfig() const
     {
-        for (int i = EQUIPMENT_SLOT_START; i < INVENTORY_SLOT_ITEM_END; ++i)
-        {
-            if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-            {
-                if (pItem->GetEntry() == item)
-                {
-                    return pItem;
-                }
-            }
-        }
-
-        for (int i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
-        {
-            if (Bag* pBag = (Bag*)player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-            {
-                if (Item* itemPtr = pBag->GetItemByEntry(item))
-                {
-                    return itemPtr;
-                }
-            }
-        }
-
-        return nullptr;
+        return (TransmogModuleConfig*)Module::GetConfig();
     }
 
     void TransmogModule::OnInitialize()
@@ -333,7 +307,7 @@ namespace transmog_module
                             if (slotName.length() > 0)
 						    {
                                 const std::string transmogStr = player->GetSession()->GetMangosString(LANG_MENU_TRANSMOGRIFY);
-                                const std::string transmogSlotStr = FormatString(transmogStr.c_str(), slotName.c_str());
+                                const std::string transmogSlotStr = helper::FormatString(transmogStr.c_str(), slotName.c_str());
                                 player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, transmogSlotStr, EQUIPMENT_SLOT_END, slot, "", 0);
 						    }
                         }
@@ -589,7 +563,7 @@ namespace transmog_module
 				    default:
 				    {
 					    // sender = target equipment slot, action = source item entry
-					    Item* sourceItem = GetItemByEntry(player, action);
+					    Item* sourceItem = player->GetItemByEntry(action);
                         Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, (uint8)(sender >= 100 ? sender - 100 : sender));
 					    if (sourceItem)
 					    {
