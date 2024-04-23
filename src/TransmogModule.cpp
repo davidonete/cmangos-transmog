@@ -4,8 +4,47 @@
 #include "Entities/Player.h"
 #include "Globals/ObjectMgr.h"
 
+#ifdef ENABLE_PLAYERBOTS
+#include "playerbot/PlayerbotAI.h"
+#endif
+
 namespace cmangos_module
 {
+    void SendAddOnMessage(const Player* player, const char* prefix, const char* message)
+    {
+        WorldPacket data;
+
+        std::ostringstream out;
+        if (strstr(prefix, "") != NULL)
+        {
+            out << prefix << "\t" << message;
+        }
+        else
+        {
+            out << message;
+        }
+
+        char* buf = mangos_strdup(out.str().c_str());
+        char* pos = buf;
+
+        while (char* line = ChatHandler::LineFromMessage(pos))
+        {
+#if EXPANSION == 0
+            ChatHandler::BuildChatPacket(data, CHAT_MSG_ADDON, line, LANG_ADDON);
+#else
+            ChatHandler::BuildChatPacket(data, CHAT_MSG_WHISPER, line, LANG_ADDON);
+#endif
+            player->GetSession()->SendPacket(data);
+        }
+
+        delete[] buf;
+    }
+
+    void SendAddOnMessage(const Player* player, const char* prefix, const std::string& message)
+    {
+        SendAddOnMessage(player, prefix, message.c_str());
+    }
+
     TransmogModule::TransmogModule()
     : Module("Transmog", new TransmogModuleConfig())
     {
@@ -21,8 +60,12 @@ namespace cmangos_module
     {
 	    if (GetConfig()->enabled)
 	    {
-		    // Delete corrupted transmog config
-		    CharacterDatabase.Execute("DELETE FROM custom_transmogrification WHERE NOT EXISTS (SELECT 1 FROM item_instance WHERE item_instance.guid = custom_transmogrification.GUID)");
+            // Cleanup non existent characters
+            CharacterDatabase.PExecute("DELETE FROM `custom_transmog_active` WHERE NOT EXISTS (SELECT 1 FROM `characters` WHERE `characters`.`guid` = `custom_transmog_active`.`player`);");
+            CharacterDatabase.PExecute("DELETE FROM `custom_transmog_discovered` WHERE NOT EXISTS (SELECT 1 FROM `characters` WHERE `characters`.`guid` = `custom_transmog_discovered`.`player`);");
+		    
+            // Delete corrupted transmog items
+		    CharacterDatabase.Execute("DELETE FROM `custom_transmog_active` WHERE NOT EXISTS (SELECT 1 FROM `item_instance` WHERE `item_instance`.`guid` = `custom_transmog_active`.`item_guid`)");
 	    }
     }
 
@@ -32,40 +75,13 @@ namespace cmangos_module
         {
 		    if (player)
 		    {
-			    const ObjectGuid playerID = player->GetObjectGuid();
+#ifdef ENABLE_PLAYERBOTS
+                if (sRandomPlayerbotMgr.IsFreeBot(player))
+                    return;
+#endif
 
-			    // Load the transmog config for the player
-			    entryMap.erase(playerID);
-                auto result = CharacterDatabase.PQuery("SELECT GUID, FakeEntry FROM custom_transmogrification WHERE Owner = %u", playerID);
-                if (result)
-                {
-                    do
-                    {
-					    Field* fields = result->Fetch();
-                        const ObjectGuid itemGUID = ObjectGuid(HIGHGUID_ITEM, (fields[0].GetUInt32()));
-                        const uint32 fakeEntry = fields[1].GetUInt32();
-                        if (sObjectMgr.GetItemPrototype(fakeEntry))
-                        {
-                            dataMap[itemGUID] = playerID;
-                            entryMap[playerID][itemGUID] = fakeEntry;
-                        }
-                        else
-                        {
-                            sLog.outError("Item entry (Entry: %u, player ID: %u) does not exist, ignoring.", fakeEntry, playerID.GetCounter());
-                            CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE FakeEntry = %u", fakeEntry);
-                        }
-                    } 
-				    while (result->NextRow());
-
-				    // Reload the item visuals
-                    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
-                    {
-                        if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
-					    {
-						    UpdateTransmogItem(player, item);
-					    }
-                    }
-			    }
+                LoadActiveTransmogs(player);
+                LoadDiscoveredTransmogs(player);
 		    }
 	    }
     }
@@ -76,14 +92,20 @@ namespace cmangos_module
 	    {
             if (player)
             {
+#ifdef ENABLE_PLAYERBOTS
+                if (sRandomPlayerbotMgr.IsFreeBot(player))
+                    return;
+#endif
+
 			    // Unload transmog config
-                const ObjectGuid playerID = player->GetObjectGuid();
+                const uint32 playerID = player->GetObjectGuid().GetCounter();
                 for (auto it = entryMap[playerID].begin(); it != entryMap[playerID].end(); ++it)
                 {
                     dataMap.erase(it->first);
                 }
 
                 entryMap.erase(playerID);
+                playerDiscoveredTransmogs.erase(playerID);
             }
 	    }
     }
@@ -92,545 +114,18 @@ namespace cmangos_module
     {
         if (GetConfig()->enabled)
         {
-		    CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE Owner = %u", playerId);
-	    }
-    }
+		    CharacterDatabase.PExecute("DELETE FROM `custom_transmog_active` WHERE `player` = %u", playerId);
+            CharacterDatabase.PExecute("DELETE FROM `custom_transmog_discovered` WHERE `player` = %u", playerId);
 
-    const char* GetSlotName(uint8 slot, Player* player)
-    {
-    
-        switch (slot)
-        {
-		    case EQUIPMENT_SLOT_HEAD: return player->GetSession()->GetMangosString(LANG_MENU_HEAD);
-		    case EQUIPMENT_SLOT_SHOULDERS: return player->GetSession()->GetMangosString(LANG_MENU_SHOULDERS);
-		    case EQUIPMENT_SLOT_BODY: return player->GetSession()->GetMangosString(LANG_MENU_SHIRT);
-		    case EQUIPMENT_SLOT_CHEST: return player->GetSession()->GetMangosString(LANG_MENU_CHEST);
-		    case EQUIPMENT_SLOT_WAIST: return player->GetSession()->GetMangosString(LANG_MENU_WAIST);
-		    case EQUIPMENT_SLOT_LEGS: return player->GetSession()->GetMangosString(LANG_MENU_LEGS);
-		    case EQUIPMENT_SLOT_FEET: return player->GetSession()->GetMangosString(LANG_MENU_FEET);
-		    case EQUIPMENT_SLOT_WRISTS: return player->GetSession()->GetMangosString(LANG_MENU_WRISTS);
-		    case EQUIPMENT_SLOT_HANDS: return player->GetSession()->GetMangosString(LANG_MENU_HANDS);
-		    case EQUIPMENT_SLOT_BACK: return player->GetSession()->GetMangosString(LANG_MENU_BACK);
-		    case EQUIPMENT_SLOT_MAINHAND: return player->GetSession()->GetMangosString(LANG_MENU_MAIN_HAND);
-		    case EQUIPMENT_SLOT_OFFHAND: return player->GetSession()->GetMangosString(LANG_MENU_OFF_HAND);
-		    case EQUIPMENT_SLOT_RANGED: return player->GetSession()->GetMangosString(LANG_MENU_RANGED);
-		    case EQUIPMENT_SLOT_TABARD: return player->GetSession()->GetMangosString(LANG_MENU_TABARD);
-		    default: return nullptr;
-        }
-    }
-
-    uint32 TransmogModule::GetTransmogPrice(const Item* item) const
-    {
-        uint32 price = 0U;
-        if (item)
-        {
-            const ItemPrototype* proto = item->GetProto();
-            price = proto->SellPrice ? proto->SellPrice : 100U;
-            price += GetConfig()->costFee;
-            price *= GetConfig()->costMultiplier;
-        }
-
-        return price;
-    }
-
-    std::string FormatPrice(uint32 copper)
-    {
-        std::ostringstream out;
-        if (!copper)
-        {
-            out << "0";
-            return out.str();
-        }
-
-        uint32 gold = uint32(copper / 10000);
-        copper -= (gold * 10000);
-        uint32 silver = uint32(copper / 100);
-        copper -= (silver * 100);
-
-        bool space = false;
-        if (gold > 0)
-        {
-            out << gold << "g";
-            space = true;
-        }
-
-        if (silver > 0 && gold < 50)
-        {
-            if (space) out << " ";
-            out << silver << "s";
-            space = true;
-        }
-
-        if (copper > 0 && gold < 10)
-        {
-            if (space) out << " ";
-            out << copper << "c";
-        }
-
-        return out.str();
-    }
-
-    bool TransmogModule::OnPreGossipHello(Player* player, Creature* creature)
-    {
-        if (GetConfig()->enabled)
-        {
-            if (player && creature)
+            // Unload transmog config
+            for (auto it = entryMap[playerId].begin(); it != entryMap[playerId].end(); ++it)
             {
-			    // Check if speaking with transmog npc
-			    if (creature->GetEntry() != TRANSMOG_NPC_ENTRY)
-				    return false;
-
-                player->GetPlayerMenu()->ClearMenus();
-
-                const std::string howDoesItWorkStr = player->GetSession()->GetMangosString(LANG_MENU_HOW);
-			    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, howDoesItWorkStr, EQUIPMENT_SLOT_END + 9, 0, "", 0);
-
-                // Only show the menu option for items that you have equipped
-                for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; slot++)
-                {
-                    // No point in checking for tabard, shirt, necklace, rings or trinkets
-                    if (slot == EQUIPMENT_SLOT_NECK || 
-					    slot == EQUIPMENT_SLOT_FINGER1 || 
-					    slot == EQUIPMENT_SLOT_FINGER2 || 
-					    slot == EQUIPMENT_SLOT_TRINKET1 || 
-					    slot == EQUIPMENT_SLOT_TRINKET2 || 
-					    slot == EQUIPMENT_SLOT_TABARD || 
-					    slot == EQUIPMENT_SLOT_BODY)
-				    {
-                        continue;
-				    }
-
-                    // Only show the menu option for transmogrifiers that you have per slot
-                    if (Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
-                    {
-                        // Only show the menu option if there is a transmogrifying option available
-                        bool hasOption = false;
-
-					    // Check in main inventory
-                        if (!hasOption)
-                        {
-                            for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
-                            {
-                                if (Item* sourceItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                                {
-                                    if (!CanApplyTransmog(player, targetItem, sourceItem))
-								    {
-                                        continue;
-								    }
-
-                                    hasOption = true;
-                                    break;
-                                }
-                            }
-                        }
-
-					    // Check in the other bags
-                        if (!hasOption)
-                        {
-                            for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
-                            {
-                                if (const auto pBag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
-                                {
-                                    for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
-                                    {
-                                        if (Item* sourceItem = pBag->GetItemByPos(static_cast<uint8>(j)))
-                                        {
-                                            if (!CanApplyTransmog(player, targetItem, sourceItem))
-										    {
-                                                continue;
-										    }
-
-                                            hasOption = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // If we find a suitable transmog in the first bag then there's no point in checking the rest
-                                if (hasOption)
-							    {
-                                    break;
-							    }
-                            }
-                        }
-
-					    // Check in the bank's main inventory
-                        if (!hasOption)
-                        {
-                            for (uint8 i = BANK_SLOT_ITEM_START; i < BANK_SLOT_ITEM_END; ++i)
-                            {
-                                if (Item* sourceItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                                {
-                                    if (!CanApplyTransmog(player, targetItem, sourceItem))
-								    {
-                                        continue;
-								    }
-
-                                    hasOption = true;
-                                    break;
-                                }
-                            }
-                        }
-
-					    // Check in the bank's other bags
-                        if (!hasOption)
-                        {
-                            for (uint8 i = BANK_SLOT_BAG_START; i < BANK_SLOT_BAG_END; ++i)
-                            {
-                                if (const auto pBag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
-                                {
-                                    for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
-                                    {
-                                        if (Item* sourceItem = pBag->GetItemByPos(static_cast<uint8>(j)))
-                                        {
-                                            if (!CanApplyTransmog(player, targetItem, sourceItem))
-										    {
-                                                continue;
-										    }
-
-                                            hasOption = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (hasOption)
-							    {
-                                    break;
-							    }
-                            }
-                        }
-
-                        if (hasOption)
-                        {
-                            const std::string slotName = GetSlotName(slot, player);
-                            if (slotName.length() > 0)
-						    {
-                                const std::string transmogStr = player->GetSession()->GetMangosString(LANG_MENU_TRANSMOGRIFY);
-                                const std::string transmogSlotStr = helper::FormatString(transmogStr.c_str(), slotName.c_str());
-                                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TABARD, transmogSlotStr, EQUIPMENT_SLOT_END, slot, "", 0);
-						    }
-                        }
-                    }
-                }
-
-                // Remove all transmogrifiers
-                const std::string removeAllStr = player->GetSession()->GetMangosString(LANG_MENU_REMOVE_ALL);
-                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, removeAllStr, EQUIPMENT_SLOT_END + 2, 0, "", 0);
-                player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_INFO_NPC_TEXT, creature->GetObjectGuid());
-                return true;
-		    }
-	    }
-
-	    return false;
-    }
-
-    bool TransmogModule::OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action, const std::string& code, uint32 gossipListId)
-    {
-        if (GetConfig()->enabled)
-        {
-            if (player && creature)
-            {
-                // Check if speaking with transmog npc
-                if (creature->GetEntry() != TRANSMOG_NPC_ENTRY)
-                    return false;
-
-			    const uint64 playerID = player->GetObjectGuid();
-			    WorldSession* playerSession = player->GetSession();
-
-                player->GetPlayerMenu()->ClearMenus();
-			    switch (sender)
-			    {
-                    // Display the available transmogs inside the options
-                    case EQUIPMENT_SLOT_END:
-                    {
-					    std::map<uint32, Item*> possibleTransmogItems;
-                        if (Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, (uint8)action))
-                        {
-                            const std::string itemName = targetItem->GetProto()->Name1;
-						    const std::string itemOption = playerSession->GetMangosString(LANG_MENU_YOUR_ITEM) + itemName;
-                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, itemOption.c_str(), sender, action, "", 0);
-
-                            // Check in main inventory
-                            for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; i++)
-                            {
-                                if (Item* sourceItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                                {
-								    const uint32 sourceItemEntry = sourceItem->GetEntry();
-                                    if (CanApplyTransmog(player, targetItem, sourceItem) && GetFakeEntry(targetItem) != sourceItemEntry)
-                                    {
-                                        if (possibleTransmogItems.find(sourceItemEntry) == possibleTransmogItems.end())
-                                        {
-                                            possibleTransmogItems[sourceItemEntry] = sourceItem;
-                                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, sourceItem->GetProto()->Name1, action + 100, sourceItemEntry, "", 0);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Check in the other bags
-                            for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; i++)
-                            {
-                                if (const auto pBag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
-                                {
-                                    for (uint32 j = 0; j < pBag->GetBagSize(); j++)
-                                    {
-                                        if (Item* sourceItem = pBag->GetItemByPos(static_cast<uint8>(j)))
-                                        {
-										    const uint32 sourceItemEntry = sourceItem->GetEntry();
-                                            if (CanApplyTransmog(player, targetItem, sourceItem) && GetFakeEntry(targetItem) != sourceItemEntry)
-                                            {
-                                                if (possibleTransmogItems.find(sourceItemEntry) == possibleTransmogItems.end())
-                                                {
-                                                    possibleTransmogItems[sourceItemEntry] = sourceItem;
-                                                    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, sourceItem->GetProto()->Name1, action + 100, sourceItemEntry, "", 0);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Check in the bank's main inventory
-                            for (uint8 i = BANK_SLOT_ITEM_START; i < BANK_SLOT_ITEM_END; i++)
-                            {
-                                if (Item* sourceItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                                {
-								    const uint32 sourceItemEntry = sourceItem->GetEntry();
-                                    if (CanApplyTransmog(player, targetItem, sourceItem) && GetFakeEntry(targetItem) != sourceItemEntry)
-                                    {
-                                        if (possibleTransmogItems.find(sourceItemEntry) == possibleTransmogItems.end())
-                                        {
-                                            possibleTransmogItems[sourceItemEntry] = sourceItem;
-                                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, sourceItem->GetProto()->Name1, action + 100, sourceItemEntry, "", 0);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Check in the bank's other bags
-                            for (uint8 i = BANK_SLOT_BAG_START; i < BANK_SLOT_BAG_END; i++)
-                            {
-                                if (const auto pBag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i)))
-                                {
-                                    for (uint32 j = 0; j < pBag->GetBagSize(); j++)
-                                    {
-                                        if (Item* sourceItem = pBag->GetItemByPos(static_cast<uint8>(j)))
-                                        {
-										    const uint32 sourceItemEntry = sourceItem->GetEntry();
-                                            if (CanApplyTransmog(player, targetItem, sourceItem) && GetFakeEntry(targetItem) != sourceItemEntry)
-                                            {
-                                                if (possibleTransmogItems.find(sourceItemEntry) == possibleTransmogItems.end())
-                                                {
-                                                    possibleTransmogItems[sourceItemEntry] = sourceItem;
-                                                    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, sourceItem->GetProto()->Name1, action + 100, sourceItemEntry, "", 0);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Remove the transmog on the current item
-						    bool hasTransmog = false;
-                            bool hasTransmogOptions = !possibleTransmogItems.empty();
-                            if (const uint32 fakeEntry = GetFakeEntry(targetItem))
-                            {
-                                hasTransmog = true;
-                                if (ItemPrototype const* pItem = sObjectMgr.GetItemPrototype(fakeEntry))
-                                {
-                                    const std::string itemName = pItem->Name1;
-                                    const std::string illusion = playerSession->GetMangosString(LANG_MENU_REMOVE) + itemName;
-                                    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, illusion.c_str(), EQUIPMENT_SLOT_END + 3, action, "", 0);
-                                }
-                            }
-                            else
-                            {
-                                if (possibleTransmogItems.empty())
-                                {
-                                    playerSession->SendAreaTriggerMessage(playerSession->GetMangosString(LANG_MENU_NO_SUITABLE_ITEMS));
-                                    OnPreGossipHello(player, creature);
-                                    return true;
-                                }
-                            }
-
-                            player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_GO_BACK), EQUIPMENT_SLOT_END + 1, 0, "", 0);
-                            if (hasTransmog && !hasTransmogOptions)
-                            {
-                                player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_ALREADY_NPC_TEXT, creature->GetObjectGuid());
-                            }
-                            else if (hasTransmog && hasTransmogOptions)
-                            {
-                                player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_ALREADY_ALT_NPC_TEXT, creature->GetObjectGuid());
-                            }
-                            else
-                            {
-                                player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_SELECT_LOOK_NPC_TEXT, creature->GetObjectGuid());
-                            }
-                        }
-                        else
-                        {
-                            OnPreGossipHello(player, creature);
-                        }
-
-                        break;
-                    }
-
-				    // Go back to main menu
-				    case EQUIPMENT_SLOT_END + 1:
-				    {
-					    OnPreGossipHello(player, creature);
-					    break;
-				    }
-
-				    // Remove all transmogrifications
-				    case EQUIPMENT_SLOT_END + 2:
-				    {
-					    bool removed = false;
-					    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
-					    {
-						    if (Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
-						    {
-							    if (!GetFakeEntry(targetItem))
-								    continue;
-
-							    DeleteFakeEntry(player, slot, targetItem);
-							    removed = true;
-						    }
-					    }
-
-					    if (removed)
-					    {
-						    playerSession->SendAreaTriggerMessage("%s", playerSession->GetMangosString(LANG_ERR_UNTRANSMOG_OK));
-						    creature->CastSpell(player, TRANSMOG_NPC_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-						    player->CastSpell(player, TRANSMOG_SELF_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-					    }
-					    else
-					    {
-						    playerSession->SendNotification(LANG_ERR_UNTRANSMOG_NO_TRANSMOGS);
-					    }
-
-					    OnPreGossipHello(player, creature);
-					    break;
-				    }
-
-				    // Remove transmogrification on a single equipped item
-				    case EQUIPMENT_SLOT_END + 3:
-				    {
-					    bool removed = false;
-					    if (Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, static_cast<uint8>(action)))
-					    {
-						    if (GetFakeEntry(targetItem))
-						    {
-							    DeleteFakeEntry(player, (uint8)action, targetItem);
-							    removed = true;
-						    }
-					    }
-
-					    const std::string slotName = GetSlotName((uint8)action, player);
-					    if (removed)
-					    {
-						    playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_UNTRANSMOG_SINGLE_OK), slotName.c_str());
-						    creature->CastSpell(player, TRANSMOG_NPC_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-						    player->CastSpell(player, TRANSMOG_SELF_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-					    }
-					    else
-					    {
-						    playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_UNTRANSMOG_SINGLE_NO_TRANSMOGS), slotName.c_str());
-					    }
-
-					    OnPreGossipHello(player, creature);
-					    break;
-				    }
-
-				    // Update all transmogrifications
-				    case EQUIPMENT_SLOT_END + 4:
-				    {
-					    //ApplyAll(player);
-					    playerSession->SendAreaTriggerMessage("Your appearance was refreshed");
-					    OnPreGossipHello(player, creature);
-					    break;
-				    }
-
-				    // Info about transmogrification
-				    case EQUIPMENT_SLOT_END + 9:
-				    {
-					    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, playerSession->GetMangosString(LANG_MENU_GO_BACK), EQUIPMENT_SLOT_END + 1, 0, "", 0);
-					    player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_INFO_NPC_TEXT, creature->GetObjectGuid());
-					    break;
-				    }
-
-				    default:
-				    {
-					    // sender = target equipment slot, action = source item entry
-					    Item* sourceItem = player->GetItemByEntry(action);
-                        Item* targetItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, (uint8)(sender >= 100 ? sender - 100 : sender));
-					    if (sourceItem)
-					    {
-						    // Check cost
-						    if (sender >= 100)
-						    {
-							    // Display transaction
-							    if (!targetItem)
-							    {
-								    OnPreGossipHello(player, creature);
-								    return true;
-							    }
-
-							    std::string nameItemTransmogrified = targetItem->GetProto()->Name1;
-							    std::string before = playerSession->GetMangosString(LANG_MENU_BEFORE) + nameItemTransmogrified;
-							    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, before.c_str(), sender, action, "", 0);
-
-							    const uint32 price = GetTransmogPrice(targetItem);
-							    std::string nameItemTransmogrifier = sourceItem->GetProto()->Name1;
-							    std::string after = playerSession->GetMangosString(LANG_MENU_AFTER) + nameItemTransmogrifier;
-							    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, after.c_str(), sender, action, "", 0);
-
-							    std::string costStr = playerSession->GetMangosString(LANG_MENU_COST_IS) + FormatPrice(price);
-							    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, costStr.c_str(), sender, action, "", 0);
-
-							    // Only show confirmation button if player has enough money
-							    if (player->GetMoney() > price)
-							    {
-								    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_MENU_CONFIRM), sender - 100, action, "", 0);
-							    }
-							    else
-							    {
-								    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, playerSession->GetMangosString(LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY), sender, action, "", 0);
-							    }
-
-							    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_GO_BACK), EQUIPMENT_SLOT_END, targetItem->GetSlot(), "", 0);
-							    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_TALK, playerSession->GetMangosString(LANG_MENU_MAIN_MENU), EQUIPMENT_SLOT_END + 1, 0, "", 0);
-							    player->GetPlayerMenu()->SendGossipMenu(TRANSMOG_CONFIRM_NPC_TEXT, creature->GetObjectGuid());
-						    }
-						    else
-						    {
-							    // sender = equipment slot, action = item entry
-							    TransmogLanguage res = ApplyTransmog(player, sourceItem, targetItem);
-							    if (res == LANG_ERR_TRANSMOG_OK)
-							    {
-								    creature->CastSpell(player, TRANSMOG_NPC_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-								    player->CastSpell(player, TRANSMOG_SELF_VISUAL_SPELL, TRIGGERED_OLD_TRIGGERED);
-								    playerSession->SendAreaTriggerMessage("%s (%s)", playerSession->GetMangosString(LANG_ERR_TRANSMOG_OK), GetSlotName((uint8)sender, player));
-							    }
-							    else
-							    {
-								    playerSession->SendNotification(res);
-							    }
-
-							    OnPreGossipHello(player, creature);
-						    }
-					    }
-
-					    break;
-				    }
-			    }
-
-                return true;
+                dataMap.erase(it->first);
             }
-        }
 
-        return false;
+            entryMap.erase(playerId);
+            playerDiscoveredTransmogs.erase(playerId);
+	    }
     }
 
     void TransmogModule::OnSetVisibleItemSlot(Player* player, uint8 slot, Item* item)
@@ -639,16 +134,44 @@ namespace cmangos_module
 	    {
 		    if (player && item)
 		    {
-                if (uint32 entry = GetFakeEntry(item))
+#ifdef ENABLE_PLAYERBOTS
+                if (sRandomPlayerbotMgr.IsFreeBot(player))
+                    return;
+#endif
+
+                if (uint32 entry = GetTransmogAppearance(item))
 			    {
-    #if EXPANSION == 2
+#if EXPANSION == 2
                     player->SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + item->GetSlot() * 2, entry);
-    #else
+#else
                     player->SetUInt32Value(PLAYER_VISIBLE_ITEM_1_0 + item->GetSlot() * MAX_VISIBLE_ITEM_OFFSET, entry);
-    #endif
+#endif
 			    }
 		    }
 	    }
+    }
+
+    void TransmogModule::OnStoreItem(Player* player, Item* item)
+    {
+        if (GetConfig()->enabled)
+        {
+            if (player && item)
+            {
+#ifdef ENABLE_PLAYERBOTS
+                if (sRandomPlayerbotMgr.IsFreeBot(player))
+                    return;
+#endif
+                // Don't consider items if the player has not finished loading from DB
+                if (playerDiscoveredTransmogs.find(player->GetObjectGuid().GetCounter()) != playerDiscoveredTransmogs.end())
+                {
+                    const uint32 itemEntry = item->GetEntry();
+                    if (IsValidTransmog(player, itemEntry))
+                    {
+                        AddDiscoveredTransmog(player, itemEntry, true, true);
+                    }
+                }
+            }
+        }
     }
 
     void TransmogModule::OnMoveItemFromInventory(Player* player, Item* item)
@@ -657,266 +180,205 @@ namespace cmangos_module
         {
             if (player && item)
             {
-			    DeleteFakeEntryFromDB(item);
+#ifdef ENABLE_PLAYERBOTS
+                if (sRandomPlayerbotMgr.IsFreeBot(player))
+                    return;
+#endif
+
+			    RemoveTransmog(player, item, false);
 		    }
 	    }
     }
 
-    bool IsRangedWeapon(uint32 Class, uint32 SubClass)
+    std::vector<ModuleChatCommand>* TransmogModule::GetCommandTable()
     {
-        return Class == ITEM_CLASS_WEAPON && 
-		       (SubClass == ITEM_SUBCLASS_WEAPON_BOW ||
-                SubClass == ITEM_SUBCLASS_WEAPON_GUN ||
-                SubClass == ITEM_SUBCLASS_WEAPON_CROSSBOW);
-    }
-
-    bool TransmogModule::CanApplyTransmog(Player* player, const Item* target, const Item* source) const
-    {
-        if (!target || !source)
-            return false;
-
-	    const ItemPrototype* targetProto = target->GetProto();
-	    const ItemPrototype* sourceProto = source->GetProto();
-
-	    // Same item
-        if (sourceProto->ItemId == targetProto->ItemId)
-            return false;
-
-	    // Same item model
-        if (sourceProto->DisplayInfoID == targetProto->DisplayInfoID)
-            return false;
-
-	    // Different item type
-        if (sourceProto->Class != targetProto->Class)
-            return false;
-
-	    // Invalid types
-        if (sourceProto->InventoryType == INVTYPE_BAG ||
-		    sourceProto->InventoryType == INVTYPE_RELIC ||
-		    sourceProto->InventoryType == INVTYPE_FINGER ||
-		    sourceProto->InventoryType == INVTYPE_TRINKET ||
-		    sourceProto->InventoryType == INVTYPE_AMMO ||
-		    sourceProto->InventoryType == INVTYPE_QUIVER)
-	    {
-            return false;
-	    }
-
-	    // Invalid types
-        if (targetProto->InventoryType == INVTYPE_BAG ||
-		    targetProto->InventoryType == INVTYPE_RELIC ||
-		    targetProto->InventoryType == INVTYPE_FINGER ||
-		    targetProto->InventoryType == INVTYPE_TRINKET ||
-		    targetProto->InventoryType == INVTYPE_AMMO ||
-		    targetProto->InventoryType == INVTYPE_QUIVER)
-	    {
-            return false;
-	    }
-
-        if (!SuitableForTransmog(player, target) || !SuitableForTransmog(player, source))
-            return false;
-
-	    // Ranged weapon check
-        if (IsRangedWeapon(sourceProto->Class, sourceProto->SubClass) != IsRangedWeapon(targetProto->Class, targetProto->SubClass))
-            return false;
-
-        if (sourceProto->InventoryType != targetProto->InventoryType)
+        static std::vector<ModuleChatCommand> commandTable =
         {
-            if (sourceProto->Class == ITEM_CLASS_WEAPON &&
-			    !(IsRangedWeapon(targetProto->Class, targetProto->SubClass)
-			      || (targetProto->InventoryType == INVTYPE_WEAPON ||
-				      targetProto->InventoryType == INVTYPE_2HWEAPON ||
-				      targetProto->InventoryType == INVTYPE_WEAPONMAINHAND ||
-				      targetProto->InventoryType == INVTYPE_WEAPONOFFHAND)
-			      && (sourceProto->InventoryType == INVTYPE_WEAPON ||
-				      sourceProto->InventoryType == INVTYPE_2HWEAPON ||
-				      sourceProto->InventoryType == INVTYPE_WEAPONMAINHAND ||
-				      sourceProto->InventoryType == INVTYPE_WEAPONOFFHAND)))
-		    {
-                return false;
-		    }
+            { "GetTransmogStatus", std::bind(&TransmogModule::HandleTransmogStatus, this, std::placeholders::_1, std::placeholders::_2), SEC_PLAYER },
+            { "GetAvailableTransmogs", std::bind(&TransmogModule::HandleGetAvailableTransmogs, this, std::placeholders::_1, std::placeholders::_2), SEC_PLAYER },
+            { "CalculateTransmogCost", std::bind(&TransmogModule::HandleCalculateTransmogCost, this, std::placeholders::_1, std::placeholders::_2), SEC_PLAYER },
+            { "ApplyTransmog", std::bind(&TransmogModule::HandleApplyTransmog, this, std::placeholders::_1, std::placeholders::_2), SEC_PLAYER }
+        };
 
-            if (sourceProto->Class == ITEM_CLASS_ARMOR &&
-                !((sourceProto->InventoryType == INVTYPE_CHEST ||
-			       sourceProto->InventoryType == INVTYPE_ROBE)
-			      &&
-                   (targetProto->InventoryType == INVTYPE_CHEST ||
-				    targetProto->InventoryType == INVTYPE_ROBE)))
-		    {
-                return false;
-		    }
-        }
-
-        return true;
+        return &commandTable;
     }
 
-    bool TransmogModule::SuitableForTransmog(Player* player, const Item* item) const
+    bool TransmogModule::HandleTransmogStatus(WorldSession* session, const std::string& args)
     {
-        if (!player || !item)
-            return false;
-
-	    const ItemPrototype* proto = item->GetProto();
-
-	    // Invalid types
-        if (proto->Class != ITEM_CLASS_ARMOR && proto->Class != ITEM_CLASS_WEAPON)
-            return false;
-
-        // Don't allow fishing poles
-        if (proto->Class == ITEM_CLASS_WEAPON && proto->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE)
-            return false;
-
-        // Check skill requirements
-        if (proto->RequiredSkill != 0)
+        if (GetConfig()->enabled)
         {
-            if (player->GetSkillValue(static_cast<uint16>(proto->RequiredSkill)) == 0)
-                return false;
-
-            if (player->GetSkillValue(static_cast<uint16>(proto->RequiredSkill)) < proto->RequiredSkillRank)
-                return false;
-        }
-
-        // Check spell requirements
-        if (proto->RequiredSpell != 0 && !player->HasSpell(proto->RequiredSpell))
-            return false;
-
-        // Check level requirements
-        if (player->GetLevel() < proto->RequiredLevel)
-            return false;
-
-        return true;
-    }
-
-    std::string GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y)
-    {
-        std::ostringstream ss;
-        ss << "|TInterface";
-
-        const ItemPrototype* temp = sObjectMgr.GetItemPrototype(entry);
-        const ItemDisplayInfoEntry* dispInfo = nullptr;
-        if (temp)
-        {
-            GameObjectDisplayInfoEntry const* info = sGameObjectDisplayInfoStore.LookupEntry(temp->DisplayInfoID);
-            dispInfo = sItemStorage.LookupEntry<ItemDisplayInfoEntry>(temp->DisplayInfoID);
-            if (dispInfo)
-		    {
-                ss << "/ICONS/" << dispInfo->ID;
-		    }
-        }
-
-        if (!dispInfo)
-	    {
-            ss << "/InventoryItems/WoWUnknownItem01";
-	    }
-
-        ss << ":" << width << ":" << height << ":" << x << ":" << y << "|t";
-        return ss.str();
-    }
-
-    std::string GetItemLink(Item* item, WorldSession* session)
-    {
-	    int loc_idx = session->GetSessionDbLocaleIndex();
-	    const ItemPrototype* temp = item->GetProto();
-	    std::string name = temp->Name1;
-
-	    std::ostringstream oss;
-	    oss << "|c" << std::hex << ItemQualityColors[temp->Quality] << std::dec <<
-		    "|Hitem:" << temp->ItemId << ":" <<
-		    item->GetEnchantmentId(PERM_ENCHANTMENT_SLOT) << ":" <<
-		    item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_0) << ":" <<
-		    item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_1) << ":" <<
-		    item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_2) << ":" <<
-		    item->GetEnchantmentId(PROP_ENCHANTMENT_SLOT_3) << ":" <<
-		    item->GetItemRandomPropertyId() << ":" << item->GetItemSuffixFactor() << ":" <<
-		    item->GetOwner()->GetLevel() << "|h[" << name << "]|h|r";
-
-	    return oss.str();
-    }
-
-    std::string GetItemLink(uint32 entry, WorldSession* session)
-    {
-	    const ItemPrototype* temp = sObjectMgr.GetItemPrototype(entry);
-	    int loc_idx = session->GetSessionDbLocaleIndex();
-	    std::string name = temp->Name1;
-	    std::ostringstream oss;
-	    oss << "|c" << std::hex << ItemQualityColors[temp->Quality] << std::dec << "|Hitem:" << entry << ":0:0:0:0:0:0:0:0:0|h[" << name << "]|h|r";
-	    return oss.str();
-    }
-
-    void TransmogModule::ShowTransmogItems(Player* player, Creature* creature, uint8 slot)
-    {
-        WorldSession* session = player->GetSession();
-        Item* oldItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
-        if (oldItem)
-        {
-            uint32 limit = 0;
-            const uint32 price = GetTransmogPrice(oldItem);
-
-            std::ostringstream ss;
-            ss << std::endl;
-            if (GetConfig()->tokenRequired)
-		    {
-                ss << std::endl << std::endl << GetConfig()->tokenAmount << " x " << GetItemLink(GetConfig()->tokenEntry, session);
-		    }
-
-            for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+            Player* player = session->GetPlayer();
+            if (player)
             {
-                if (limit > MAX_OPTIONS)
-                    break;
-
-                Item* newItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i);
-                if (!newItem)
-                    continue;
-
-                if (!CanApplyTransmog(player, oldItem, newItem))
-                    continue;
-
-                if (GetFakeEntry(oldItem) == newItem->GetEntry())
-                    continue;
-
-                player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, ss.str(), price, false, "", 0);
-
-			    ++limit;
+                SendActiveTransmogs(player);
+                return true;
             }
+        }
 
-            for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
+        return false;
+    }
+
+    bool TransmogModule::HandleGetAvailableTransmogs(WorldSession* session, const std::string& args)
+    {
+        if (GetConfig()->enabled)
+        {
+            Player* player = session->GetPlayer();
+            if (player)
             {
-                const auto bag = dynamic_cast<Bag*>(player->GetItemByPos(INVENTORY_SLOT_BAG_0, i));
-                if (!bag)
-                    continue;
+                SendDiscoveredTransmogs(player);
+                return true;
+            }
+        }
 
-                for (uint32 j = 0; j < bag->GetBagSize(); ++j)
+        return false;
+    }
+
+    bool TransmogModule::HandleCalculateTransmogCost(WorldSession* session, const std::string& args)
+    {
+        if (GetConfig()->enabled)
+        {
+            Player* player = session->GetPlayer();
+            if (player)
+            {
+                std::vector<std::pair<uint32, uint32>> slots;
+                std::vector<std::string> slotsStr = helper::SplitString(args, ",");
+                for (const auto& slotStr : slotsStr)
                 {
-                    if (limit > MAX_OPTIONS)
-                        break;
+                    std::vector<std::string> slotPair = helper::SplitString(slotStr, ":");
+                    if (slotPair.size() == 2)
+                    {
+                        if (helper::IsValidNumberString(slotPair[0]) && helper::IsValidNumberString(slotPair[1]))
+                        {
+                            const uint32 slot = std::stoi(slotPair[0]);
+                            const uint32 itemID = std::stoi(slotPair[1]);
+                            slots.push_back(std::make_pair(slot, itemID));
+                        }
+                    }
+                }
 
-                    Item* newItem = player->GetItemByPos(i, j);
-                    if (!newItem)
-                        continue;
-
-                    if (!CanApplyTransmog(player, oldItem, newItem))
-                        continue;
-
-                    if (GetFakeEntry(oldItem) == newItem->GetEntry())
-                        continue;
-
-                    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, 
-																	     GetItemIcon(newItem->GetEntry(), 30, 30, -18, 0) + GetItemLink(newItem, session), 
-																	     slot, 
-																	     newItem->GetObjectGuid().GetCounter(), 
-																	     "Using this item for transmogrify will bind it to you and make it non-refundable and non-tradeable.\nDo you wish to continue?\n\n" + GetItemIcon(newItem->GetEntry(), 40, 40, -15, -10) + GetItemLink(newItem, session) + ss.str(),  
-																	     false);
-            
-				    ++limit;
-			    }
+                SendTransmogCost(player, slots);
+                return true;
             }
         }
 
-	    player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Remove transmogrification", EQUIPMENT_SLOT_END + 3, slot, "Remove transmogrification from the slot?", false);
-        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Update menu", EQUIPMENT_SLOT_END, slot, "", 0);
-        player->GetPlayerMenu()->GetGossipMenu().AddMenuItem(GOSSIP_ICON_MONEY_BAG, "Back...", EQUIPMENT_SLOT_END + 1, 0, "", 0);
-        player->GetPlayerMenu()->SendGossipMenu(DEFAULT_GOSSIP_MESSAGE, creature->GetObjectGuid());
+        return false;
     }
 
-    void TransmogModule::UpdateTransmogItem(Player* player, Item* item) const
+    bool TransmogModule::HandleApplyTransmog(WorldSession* session, const std::string& args)
+    {
+        if (GetConfig()->enabled)
+        {
+            Player* player = session->GetPlayer();
+            if (player)
+            {
+                std::vector<std::pair<uint32, uint32>> slots;
+                std::vector<std::string> slotsStr = helper::SplitString(args, ",");
+                for (const auto& slotStr : slotsStr)
+                {
+                    std::vector<std::string> slotPair = helper::SplitString(slotStr, ":");
+                    if (slotPair.size() == 2)
+                    {
+                        if (helper::IsValidNumberString(slotPair[0]) && helper::IsValidNumberString(slotPair[1]))
+                        {
+                            const uint32 slot = std::stoi(slotPair[0]);
+                            const uint32 itemID = std::stoi(slotPair[1]);
+                            slots.push_back(std::make_pair(slot, itemID));
+                        }
+                    }
+                }
+
+                uint32 cost = 0;
+                uint32 tokenID = 0;
+                bool succeeded = false;
+
+                if (slots.size() > 0)
+                {
+                    for (auto& pair : slots)
+                    {
+                        const uint32 slot = pair.first;
+                        const uint32 itemID = pair.second;
+                        if (const Item* slotItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                        {
+                            std::pair<uint32, uint32> itemCost = CalculateTransmogCost(slotItem->GetEntry());
+                            cost += itemCost.first;
+                            tokenID = itemCost.second;
+                        }
+                    }
+
+                    succeeded = tokenID ? player->HasItemCount(tokenID, cost) : player->GetMoney() >= cost;
+                }
+
+                if (succeeded)
+                {
+                    for (auto& pair : slots)
+                    {
+                        const uint32 slot = pair.first;
+                        const uint32 itemID = pair.second;
+                        if (Item* slotItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                        {
+                            if (itemID > 0)
+                            {
+                                if (!ApplyTransmog(player, slotItem, itemID, true))
+                                {
+                                    succeeded = false;
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                if (!RemoveTransmog(player, slotItem, true))
+                                {
+                                    succeeded = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (succeeded)
+                {
+                    if (tokenID)
+                    {
+                        player->DestroyItemCount(tokenID, cost, true);
+                    }
+                    else
+                    {
+                        player->ModifyMoney(-(int32)cost);
+                    }
+
+                    player->GetPlayerMenu();
+
+                    std::ostringstream out;
+                    bool first = true;
+                    for (auto& pair : slots)
+                    {
+                        if (first)
+                        {
+                            out << pair.first << "," << pair.second;
+                            first = false;
+                        }
+                        else
+                        {
+                            out << ":" << pair.first << "," << pair.second;
+                        }
+                    }
+
+                    SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString("ApplyTransmogResult:1:%s", out.str().c_str()));
+                }
+                else
+                {
+                    SendAddOnMessage(player, GetChatCommandPrefix(), "ApplyTransmogResult:0");
+                }
+                
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void TransmogModule::UpdateItemAppearance(Player* player, Item* item) const
     {
         if (item->IsEquipped())
 	    {
@@ -924,65 +386,7 @@ namespace cmangos_module
 	    }
     }
 
-    TransmogLanguage TransmogModule::ApplyTransmog(Player* player, Item* sourceItem, Item* targetItem)
-    {
-        if (!targetItem)
-        {
-            return LANG_ERR_TRANSMOG_MISSING_DEST_ITEM;
-        }
-
-	    // reset look newEntry
-        if (!sourceItem) 
-        {
-            // Custom
-            DeleteFakeEntry(player, targetItem->GetSlot(), targetItem);
-        }
-        else
-        {
-            if (!CanApplyTransmog(player, targetItem, sourceItem))
-                return LANG_ERR_TRANSMOG_INVALID_ITEMS;
-
-            if (GetFakeEntry(targetItem) == sourceItem->GetEntry())
-                return LANG_ERR_TRANSMOG_SAME_DISPLAYID;
-
-            if (GetConfig()->tokenRequired)
-            {
-                if (player->HasItemCount(GetConfig()->tokenEntry, GetConfig()->tokenAmount))
-			    {
-                    player->DestroyItemCount(GetConfig()->tokenEntry, GetConfig()->tokenAmount, true);
-			    }
-                else
-			    {
-                    return LANG_ERR_TRANSMOG_NOT_ENOUGH_TOKENS;
-			    }
-            }
-
-            const uint32 price = GetTransmogPrice(targetItem);
-            if (price)
-            {
-                if (player->GetMoney() < price)
-			    {
-                    return LANG_ERR_TRANSMOG_NOT_ENOUGH_MONEY;
-			    }
-
-                player->ModifyMoney(-(int)price);
-            }
-
-            SetFakeEntry(player, sourceItem->GetEntry(), targetItem);
-            targetItem->SetOwnerGuid(player->GetObjectGuid());
-
-            if (sourceItem->GetProto()->Bonding == BIND_WHEN_EQUIPPED || sourceItem->GetProto()->Bonding == BIND_WHEN_USE)
-		    {
-                sourceItem->SetBinding(true);
-		    }
-
-            sourceItem->SetOwnerGuid(player->GetObjectGuid());
-        }
-
-        return LANG_ERR_TRANSMOG_OK;
-    }
-
-    uint32 TransmogModule::GetFakeEntry(Item* item) const
+    uint32 TransmogModule::GetTransmogAppearance(const Item* item) const
     {	
 	    if (item)
 	    {
@@ -999,29 +403,37 @@ namespace cmangos_module
 	    return 0;
     }
 
-    void TransmogModule::SetFakeEntry(Player* player, uint32 newEntry, Item* item)
+    bool TransmogModule::ApplyTransmog(Player* player, Item* item, uint32 transmogItemID, bool updateAppearance)
     {
-	    if (item)
-	    {
-		    const ObjectGuid itemGUID = item->GetObjectGuid();
-		    entryMap[player->GetObjectGuid()][itemGUID] = newEntry;
-		    dataMap[itemGUID] = player->GetObjectGuid();
-		    CharacterDatabase.PExecute("REPLACE INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES (%u, %u, %u)", itemGUID.GetCounter(), newEntry, player->GetObjectGuid());
-		    UpdateTransmogItem(player, item);
-	    }
+        if (player && item)
+        {
+            if (IsValidTransmog(player, transmogItemID))
+            {
+                const ObjectGuid itemGUID = item->GetObjectGuid();
+                const uint32 playerID = player->GetObjectGuid().GetCounter();
+
+                entryMap[playerID][itemGUID] = transmogItemID;
+                dataMap[itemGUID] = playerID;
+
+                CharacterDatabase.PExecute("REPLACE INTO `custom_transmog_active` (`item_guid`, `transmog_entry`, `player`) VALUES (%u, %u, %u)", itemGUID.GetCounter(), transmogItemID, playerID);
+
+                if (updateAppearance)
+                {
+                    UpdateItemAppearance(player, item);
+                }
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    void TransmogModule::DeleteFakeEntry(Player* player, uint8, Item* item)
+    bool TransmogModule::RemoveTransmog(Player* player, Item* item, bool updateAppearance)
     {
-        DeleteFakeEntryFromDB(item);
-        UpdateTransmogItem(player, item);
-    }
-
-    void TransmogModule::DeleteFakeEntryFromDB(Item* item)
-    {
-	    if (item)
-	    {
-		    const ObjectGuid itemGUID = item->GetObjectGuid();
+        if (player && item)
+        {
+            const ObjectGuid itemGUID = item->GetObjectGuid();
             if (dataMap.find(itemGUID) != dataMap.end())
             {
                 if (entryMap.find(dataMap[itemGUID]) != entryMap.end())
@@ -1032,7 +444,476 @@ namespace cmangos_module
                 dataMap.erase(itemGUID);
             }
 
-            CharacterDatabase.PExecute("DELETE FROM custom_transmogrification WHERE GUID = %u", itemGUID.GetCounter());
-	    }
+            CharacterDatabase.PExecute("DELETE FROM `custom_transmog_active` WHERE `item_guid` = %u", itemGUID.GetCounter());
+
+            if (updateAppearance)
+            {
+                UpdateItemAppearance(player, item);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    bool TransmogModule::IsItemTransmogrified(const Item* item) const
+    {
+        return GetTransmogAppearance(item) != 0;
+    }
+
+    std::vector<std::pair<Item*, uint32>> TransmogModule::GetTransmogrifiedItems(const Player* player, bool equipped) const
+    {
+        std::vector<std::pair<Item*, uint32>> transmogrifiedItems;
+        if (player)
+        {
+            if (equipped)
+            {
+                for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+                {
+                    if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                    {
+                        uint32 transmogItemEntry = GetTransmogAppearance(item);
+                        if (transmogItemEntry != 0)
+                        {
+                            transmogrifiedItems.push_back(std::make_pair(item, transmogItemEntry));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                auto playerTransmogsIt = entryMap.find(player->GetObjectGuid());
+                if (playerTransmogsIt != entryMap.end())
+                {
+                    const auto& playerTransmogs = playerTransmogsIt->second;
+                    for (const auto it : playerTransmogs)
+                    {
+                        if (Item* item = player->GetItemByGuid(it.first))
+                        {
+                            transmogrifiedItems.push_back(std::make_pair(item, it.second));
+                        }
+                    }
+                }
+            }
+        }
+
+        return transmogrifiedItems;
+    }
+
+    std::vector<uint8> GetWeaponAvailableForClass(uint8 playerClass)
+    {
+        std::map<uint8, std::vector<uint8>> weaponPerClass =
+        {
+            { CLASS_WARRIOR, { ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_AXE2, ITEM_SUBCLASS_WEAPON_BOW, ITEM_SUBCLASS_WEAPON_GUN, ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_MACE2, ITEM_SUBCLASS_WEAPON_POLEARM, ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_SWORD2, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_FIST, ITEM_SUBCLASS_WEAPON_DAGGER, ITEM_SUBCLASS_WEAPON_CROSSBOW } },
+            { CLASS_PALADIN, { ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_AXE2, ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_MACE2, ITEM_SUBCLASS_WEAPON_POLEARM, ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_SWORD2 } },
+            { CLASS_HUNTER, { ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_AXE2, ITEM_SUBCLASS_WEAPON_BOW, ITEM_SUBCLASS_WEAPON_GUN, ITEM_SUBCLASS_WEAPON_POLEARM, ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_SWORD2, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_FIST, ITEM_SUBCLASS_WEAPON_DAGGER, ITEM_SUBCLASS_WEAPON_CROSSBOW } },
+            { CLASS_ROGUE, { ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_BOW, ITEM_SUBCLASS_WEAPON_GUN, ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_FIST, ITEM_SUBCLASS_WEAPON_DAGGER, ITEM_SUBCLASS_WEAPON_CROSSBOW } },
+            { CLASS_PRIEST, { ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_DAGGER, ITEM_SUBCLASS_WEAPON_WAND } },
+#if EXPANSION == 2
+            { CLASS_DEATH_KNIGHT, { ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_AXE2, ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_MACE2, ITEM_SUBCLASS_WEAPON_POLEARM, ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_SWORD2 } },
+#endif
+            { CLASS_SHAMAN, { ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_AXE2, ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_MACE2, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_FIST, ITEM_SUBCLASS_WEAPON_DAGGER } },
+            { CLASS_MAGE, { ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_DAGGER, ITEM_SUBCLASS_WEAPON_WAND } },
+            { CLASS_WARLOCK, { ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_DAGGER, ITEM_SUBCLASS_WEAPON_WAND } },
+            { CLASS_DRUID, { ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_POLEARM, ITEM_SUBCLASS_WEAPON_STAFF, ITEM_SUBCLASS_WEAPON_FIST, ITEM_SUBCLASS_WEAPON_DAGGER } },
+        };
+
+        return weaponPerClass[playerClass];
+    }
+
+    std::vector<uint8> GetArmorAvailableForClass(uint8 playerClass)
+    {
+        std::map<uint8, std::vector<uint8>> armorPerClass =
+        {
+            { CLASS_WARRIOR, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER, ITEM_SUBCLASS_ARMOR_MAIL, ITEM_SUBCLASS_ARMOR_PLATE, ITEM_SUBCLASS_ARMOR_SHIELD } },
+            { CLASS_PALADIN, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER, ITEM_SUBCLASS_ARMOR_MAIL, ITEM_SUBCLASS_ARMOR_PLATE, ITEM_SUBCLASS_ARMOR_SHIELD } },
+            { CLASS_HUNTER, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER, ITEM_SUBCLASS_ARMOR_MAIL } },
+            { CLASS_ROGUE, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER } },
+            { CLASS_PRIEST, { ITEM_SUBCLASS_ARMOR_CLOTH } },
+#if EXPANSION == 2
+            { CLASS_DEATH_KNIGHT, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER, ITEM_SUBCLASS_ARMOR_MAIL, ITEM_SUBCLASS_ARMOR_PLATE } },
+#endif
+            { CLASS_SHAMAN, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER, ITEM_SUBCLASS_ARMOR_MAIL } },
+            { CLASS_MAGE, { ITEM_SUBCLASS_ARMOR_CLOTH } },
+            { CLASS_WARLOCK, { ITEM_SUBCLASS_ARMOR_CLOTH } },
+            { CLASS_DRUID, { ITEM_SUBCLASS_ARMOR_CLOTH, ITEM_SUBCLASS_ARMOR_LEATHER } },
+        };
+
+        return armorPerClass[playerClass];
+    }
+
+    bool TransmogModule::IsValidTransmog(const Player* player, const ItemPrototype* itemPrototype) const
+    {
+        if (player && itemPrototype)
+        {
+            if (itemPrototype->Class == ITEM_CLASS_WEAPON || itemPrototype->Class == ITEM_CLASS_ARMOR)
+            {
+                const uint8 playerClass = player->getClass();
+                std::vector<uint8> itemTypeAvailable;
+                if (itemPrototype->Class == ITEM_CLASS_WEAPON)
+                {
+                    itemTypeAvailable = GetWeaponAvailableForClass(playerClass);
+                }
+                else if (itemPrototype->Class == ITEM_CLASS_ARMOR)
+                {
+                    itemTypeAvailable = GetArmorAvailableForClass(playerClass);
+                }
+
+                for (uint8 subclassAvailable : itemTypeAvailable)
+                {
+                    if (itemPrototype->SubClass == subclassAvailable)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    bool TransmogModule::IsValidTransmog(const Player* player, uint32 itemEntry) const
+    {
+        return IsValidTransmog(player, sObjectMgr.GetItemPrototype(itemEntry));
+    }
+
+    void TransmogModule::LoadActiveTransmogs(Player* player)
+    {
+        const uint32 playerID = player->GetObjectGuid().GetCounter();
+        entryMap.erase(playerID);
+
+        auto result = CharacterDatabase.PQuery("SELECT `item_guid`, `transmog_entry` FROM `custom_transmog_active` WHERE `player` = %u", playerID);
+        if (result)
+        {
+            do
+            {
+                Field* fields = result->Fetch();
+                const ObjectGuid itemGUID = ObjectGuid(HIGHGUID_ITEM, (fields[0].GetUInt32()));
+                const uint32 transmogEntry = fields[1].GetUInt32();
+                if (sObjectMgr.GetItemPrototype(transmogEntry))
+                {
+                    dataMap[itemGUID] = playerID;
+                    entryMap[playerID][itemGUID] = transmogEntry;
+                }
+                else
+                {
+                    sLog.outError("Item entry (Entry: %u, player ID: %u) does not exist, ignoring.", transmogEntry, playerID);
+                    CharacterDatabase.PExecute("DELETE FROM `custom_transmog_active` WHERE `transmog_entry` = %u", transmogEntry);
+                }
+            } 
+            while (result->NextRow());
+
+            // Reload the item visuals
+            for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+            {
+                if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                {
+                    UpdateItemAppearance(player, item);
+                }
+            }
+        }
+    }
+
+    void TransmogModule::SendActiveTransmogs(const Player* player)
+    {
+        const auto transmogItems = GetTransmogrifiedItems(player, true);
+        if (!transmogItems.empty())
+        {
+            bool first = true;
+            std::ostringstream out;
+            for (const auto& pair : transmogItems)
+            {
+                const uint32 itemSlot = pair.first->GetSlot();
+                const uint32 transmogEntry = pair.second;
+                if (first)
+                {
+                    first = false;
+                    out << helper::FormatString("%u,%u", itemSlot, transmogEntry);
+                }
+                else
+                {
+                    out << helper::FormatString(":%u,%u", itemSlot, transmogEntry);
+                }
+            }
+
+            SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString("TransmogStatus:%u:%s", transmogItems.size(), out.str().c_str()));
+        }
+        else
+        {
+            SendAddOnMessage(player, GetChatCommandPrefix(), "TransmogStatus:0");
+        }
+    }
+
+    void TransmogModule::LoadDiscoveredTransmogs(const Player* player)
+    {
+        if (player)
+        {
+            const uint32 playerID = player->GetObjectGuid().GetCounter();
+            auto& discoveredTransmogs = playerDiscoveredTransmogs[playerID];
+            discoveredTransmogs.clear();
+
+            auto result = CharacterDatabase.PQuery("SELECT `item_entry` FROM `custom_transmog_discovered` WHERE `player` = %u", playerID);
+            if (result)
+            {
+                do
+                {
+                    Field* fields = result->Fetch();
+                    const uint32 itemEntry = fields[0].GetUInt32();
+                    if (IsValidTransmog(player, itemEntry))
+                    {
+                        AddDiscoveredTransmog(player, itemEntry, false, false);
+                    }
+                    else
+                    {
+                        sLog.outError("Item entry (Entry: %u, player ID: %u) does not exist, ignoring.", itemEntry, playerID);
+                        CharacterDatabase.PExecute("DELETE FROM `custom_transmog_discovered` WHERE `item_entry` = %u", itemEntry);
+                    }
+                } 
+                while (result->NextRow());
+            }
+            else
+            {
+                // Calculate all available transmog from the items in the inventory
+                auto CheckTransmogItem = [&](Item* inventoryItem)
+                {
+                    const uint32 itemEntry = inventoryItem->GetEntry();
+                    if (IsValidTransmog(player, itemEntry))
+                    {
+                        AddDiscoveredTransmog(player, itemEntry, false, true);
+                    }
+                };
+
+                helper::ForEachEquippedItem(player, CheckTransmogItem);
+                helper::ForEachInventoryItem(player, CheckTransmogItem);
+                helper::ForEachBankItem(player, CheckTransmogItem);
+            }
+        }
+    }
+
+    void TransmogModule::AddDiscoveredTransmog(const Player* player, uint32 itemEntry, bool sendToClient, bool addToDB)
+    {
+        const uint32 playerID = player->GetObjectGuid().GetCounter();
+        auto it = playerDiscoveredTransmogs.find(playerID);
+        if (it != playerDiscoveredTransmogs.end())
+        {
+            auto& availableTransmogs = it->second;
+            if (const ItemPrototype* proto = sObjectMgr.GetItemPrototype(itemEntry))
+            {
+                if (availableTransmogs.find(proto->DisplayInfoID) == availableTransmogs.end())
+                {
+                    TransmogItem transmogItem;
+                    transmogItem.itemClass = proto->Class;
+                    transmogItem.itemSubclass = proto->SubClass;
+                    transmogItem.itemID = proto->ItemId;
+                    transmogItem.displayID = proto->DisplayInfoID;
+
+                    if (player->ViableEquipSlots(proto, &transmogItem.slots[0]))
+                    {
+                        if (addToDB)
+                        {
+                            CharacterDatabase.PExecute("INSERT INTO `custom_transmog_discovered` (`player`, `item_entry`) VALUES (%u, %u)", playerID, transmogItem.itemID);
+                        }
+
+                        availableTransmogs.insert(std::make_pair(transmogItem.displayID, transmogItem));
+
+                        if (sendToClient)
+                        {
+                            // Send message to client addon when new item has been discovered
+                            SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString("NewTransmog:%u", transmogItem.itemID));
+
+                            // Refresh the client addon available transmogs
+                             for (uint8 slot : transmogItem.slots)
+                            {
+                                if (slot != NULL_SLOT)
+                                {
+                                    SendDiscoveredTransmogs(player, slot, transmogItem.itemClass, transmogItem.itemSubclass);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void TransmogModule::SendDiscoveredTransmogs(const Player* player, int8 slot, int8 itemClass, int8 itemSubclass)
+    {
+        const auto& discoveredTransmogs = playerDiscoveredTransmogs[player->GetObjectGuid().GetCounter()];
+
+        // Sort by item types
+        //        slot            item class + item subclass      item id
+        std::map <uint8, std::map<uint32, std::vector<uint32>>> discoveredTransmogsFormatted;
+        for (const auto& pair : discoveredTransmogs)
+        {
+            const TransmogItem& transmogItem = pair.second;
+
+            if (itemClass >= 0 && itemClass != transmogItem.itemClass)
+                continue;
+
+            if (itemSubclass >= 0 && itemSubclass != transmogItem.itemSubclass)
+                continue;
+
+            const uint32 transmogItemClass = transmogItem.itemClass + transmogItem.itemSubclass;
+            for (uint8 transmogSlot : transmogItem.slots)
+            {
+                if (slot >= 0 && slot != transmogSlot)
+                    continue;
+
+                if (transmogSlot != NULL_SLOT)
+                {
+                    bool front = false;
+                    if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, transmogSlot))
+                    {
+                        front = item->GetEntry() == transmogItem.itemID;
+                    }
+
+                    if (front)
+                    {
+                        discoveredTransmogsFormatted[transmogSlot][transmogItemClass].insert(discoveredTransmogsFormatted[transmogSlot][transmogItemClass].begin(), transmogItem.itemID);
+                    }
+                    else
+                    {
+                        discoveredTransmogsFormatted[transmogSlot][transmogItemClass].push_back(transmogItem.itemID);
+                    }
+                }
+            }
+        }
+
+        for (auto& itemSlotIt : discoveredTransmogsFormatted)
+        {
+            const uint8 itemSlot = itemSlotIt.first;
+            for (auto& itemClassIt : itemSlotIt.second)
+            {
+                const uint8 itemClass = itemClassIt.first;
+                const std::vector<uint32>& itemIDs = itemClassIt.second;
+                const uint32 amount = itemIDs.size();
+
+                SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString
+                (
+                    "AvailableTransmogs:%u:%u:%u:%s",
+                    itemSlot,
+                    itemClass,
+                    amount,
+                    "start"
+                ));
+
+                uint32 itemIDCounter = 0;
+                constexpr uint32 itemIDLimit = 10;
+
+                bool first = true;
+                std::ostringstream out;
+                for (uint32 itemID : itemIDs)
+                {
+                    if (first)
+                    {
+                        first = false;
+                        out << itemID;
+                    }
+                    else
+                    {
+                        out << ":" << itemID;
+                    }
+
+                    itemIDCounter++;
+
+                    if (itemIDCounter >= itemIDLimit)
+                    {
+                        SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString
+                        (
+                            "AvailableTransmogs:%u:%u:%u:%s",
+                            itemSlot,
+                            itemClass,
+                            amount,
+                            out.str().c_str()
+                        ));
+
+                        itemIDCounter = 0;
+                        first = true;
+                        out.str("");
+                    }
+                }
+
+                if (!out.str().empty())
+                {
+                    SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString
+                    (
+                        "AvailableTransmogs:%u:%u:%u:%s",
+                        itemSlot,
+                        itemClass,
+                        amount,
+                        out.str().c_str()
+                    ));
+                }
+
+                SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString
+                (
+                    "AvailableTransmogs:%u:%u:%u:%s",
+                    itemSlot,
+                    itemClass,
+                    amount,
+                    "end"
+                ));
+            }
+        }
+    }
+
+    std::pair<uint32, uint32> TransmogModule::CalculateTransmogCost(uint32 itemEntry) const
+    {
+        std::pair<uint32, uint32> result = { 0, 0 };
+        uint32& cost = result.first;
+        uint32& tokenID = result.second;
+
+        if (GetConfig()->tokenRequired)
+        {
+            tokenID = GetConfig()->tokenEntry;
+            cost = GetConfig()->tokenAmount;
+        }
+        else
+        {
+            if (const ItemPrototype* proto = sObjectMgr.GetItemPrototype(itemEntry))
+            {
+                cost = proto->SellPrice ? proto->SellPrice : 100U;
+                cost += GetConfig()->costFee;
+                cost *= GetConfig()->costMultiplier;
+            }
+        }
+
+        return result;
+    }
+
+    void TransmogModule::SendTransmogCost(const Player* player, const std::vector<std::pair<uint32, uint32>>& slots) const
+    {
+        if (player)
+        {
+            uint32 cost = 0;
+            uint32 tokenID = 0;
+            bool canPurchase = false;
+
+            if (slots.size() > 0)
+            {
+                for (auto& pair : slots)
+                {
+                    const uint32 slot = pair.first;
+                    const uint32 itemID = pair.second;
+                    if (const Item* slotItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+                    {
+                        std::pair<uint32, uint32> itemCost = CalculateTransmogCost(slotItem->GetEntry());
+                        cost += itemCost.first;
+                        tokenID = itemCost.second;
+                    }
+                }
+
+                canPurchase = tokenID ? player->HasItemCount(tokenID, cost) : player->GetMoney() >= cost;
+            }
+
+            SendAddOnMessage(player, GetChatCommandPrefix(), helper::FormatString
+            (
+                "TransmogCost:%u:%u:%u",
+                cost,
+                tokenID,
+                canPurchase ? 1 : 0
+            ));
+        }
     }
 }

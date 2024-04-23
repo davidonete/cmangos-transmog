@@ -25,10 +25,14 @@ namespace cmangos_module
         tokenEntry = config.GetIntDefault("Transmog.TokenEntry", 0U);
         tokenAmount = config.GetIntDefault("Transmog.TokenAmount", 1U);
 
-        if (tokenRequired && !sObjectMgr.GetItemPrototype(tokenEntry))
+        if (tokenRequired)
         {
-            sLog.outError("Transmog.TokenEntry (%u) does not exist. Disabling token requirements", tokenRequired);
-            tokenRequired = false;
+            auto result = WorldDatabase.PQuery("SELECT COUNT(*) FROM `item_template` WHERE `entry` = %u", tokenEntry);
+            if (!result)
+            {
+                sLog.outError("Transmog.TokenEntry (%u) does not exist. Disabling token requirements", tokenRequired);
+                tokenRequired = false;
+            }
         }
 
         if (tokenRequired && tokenAmount == 0)

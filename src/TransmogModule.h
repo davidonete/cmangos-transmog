@@ -10,8 +10,17 @@
 namespace cmangos_module
 {
     typedef std::unordered_map<ObjectGuid, uint32> Transmog2Data;
-    typedef std::unordered_map<ObjectGuid, Transmog2Data> TransmogMap;
-    typedef std::unordered_map<ObjectGuid, ObjectGuid> TransmogData;
+    typedef std::unordered_map<uint32, Transmog2Data> TransmogMap;
+    typedef std::unordered_map<ObjectGuid, uint32> TransmogData;
+
+    struct TransmogItem
+    {
+        uint8 slots[4];
+        uint8 itemClass;
+        uint8 itemSubclass;
+        uint32 itemID;
+        uint32 displayID;
+    };
 
     class TransmogModule : public Module
     {
@@ -26,27 +35,46 @@ namespace cmangos_module
         void OnLoadFromDB(Player* player) override;
         void OnLogOut(Player* player) override;
         void OnDeleteFromDB(uint32 playerId) override;
-        bool OnPreGossipHello(Player* player, Creature* creature) override;
-        bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action, const std::string& code, uint32 gossipListId) override;
         void OnSetVisibleItemSlot(Player* player, uint8 slot, Item* item) override;
         void OnMoveItemFromInventory(Player* player, Item* item) override;
+        void OnStoreItem(Player* player, Item* item) override;
+
+        // Commands
+        std::vector<ModuleChatCommand>* GetCommandTable() override;
+        const char* GetChatCommandPrefix() const override { return "transmog"; }
+        bool HandleTransmogStatus(WorldSession* session, const std::string& args);
+        bool HandleGetAvailableTransmogs(WorldSession* session, const std::string& args);
+        bool HandleCalculateTransmogCost(WorldSession* session, const std::string& args);
+        bool HandleApplyTransmog(WorldSession* session, const std::string& args);
 
     private:
-        bool CanApplyTransmog(Player* player, const Item* target, const Item* source) const;
-        bool SuitableForTransmog(Player* player, const Item* item) const;
-        void ShowTransmogItems(Player* player, Creature* creature, uint8 slot);
-        void UpdateTransmogItem(Player* player, Item* item) const;
-        TransmogLanguage ApplyTransmog(Player* player, Item* sourceItem, Item* targetItem);
-        uint32 GetTransmogPrice(const Item* item) const;
+        void UpdateItemAppearance(Player* player, Item* item) const;
+        uint32 GetTransmogAppearance(const Item* item) const;
+        
+        bool ApplyTransmog(Player* player, Item* item, uint32 transmogItemID, bool updateVisibility);
+        bool RemoveTransmog(Player* player, Item* item, bool updateVisibility);
 
-        uint32 GetFakeEntry(Item* item) const;
-        void SetFakeEntry(Player* player, uint32 newEntry, Item* item);
-        void DeleteFakeEntry(Player* player, uint8, Item* item);
-        void DeleteFakeEntryFromDB(Item* item);
+        bool IsItemTransmogrified(const Item* item) const;
+        std::vector<std::pair<Item*, uint32>> GetTransmogrifiedItems(const Player* player, bool equipped = false) const;
+
+        bool IsValidTransmog(const Player* player, const ItemPrototype* itemPrototype) const;
+        bool IsValidTransmog(const Player* player, uint32 itemEntry) const;
+
+        void LoadActiveTransmogs(Player* player);
+        void SendActiveTransmogs(const Player* player);
+
+        void LoadDiscoveredTransmogs(const Player* player);
+        void AddDiscoveredTransmog(const Player* player, uint32 itemEntry, bool sendToClient, bool addToDB);
+        void SendDiscoveredTransmogs(const Player* player, int8 slot = -1, int8 itemClass = -1, int8 itemSubclass = -1);
+
+        std::pair<uint32, uint32> CalculateTransmogCost(uint32 itemEntry) const;
+        void SendTransmogCost(const Player* player, const std::vector<std::pair<uint32, uint32>>& slots) const;
 
     private:
         TransmogMap entryMap;
         TransmogData dataMap;
+
+        std::unordered_map<uint32, std::map<uint32, TransmogItem>> playerDiscoveredTransmogs;
     };
 }
 #endif
