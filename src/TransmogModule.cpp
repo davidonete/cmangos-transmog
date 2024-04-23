@@ -549,6 +549,14 @@ namespace cmangos_module
         {
             if (itemPrototype->Class == ITEM_CLASS_WEAPON || itemPrototype->Class == ITEM_CLASS_ARMOR)
             {
+                // Class/race requirement check
+                if ((itemPrototype->AllowableClass & player->getClassMask()) == 0 ||
+                    (itemPrototype->AllowableRace & player->getRaceMask()) == 0)
+                {
+                    return false;
+                }
+
+                // Valid for class check
                 const uint8 playerClass = player->getClass();
                 std::vector<uint8> itemTypeAvailable;
                 if (itemPrototype->Class == ITEM_CLASS_WEAPON)
