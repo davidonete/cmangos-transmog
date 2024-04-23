@@ -1,5 +1,5 @@
 # Transmog
-Module to allow changing your equipped item appearances with ones in your bags or banks. This tries to simulate the transmog feature introduced in Cataclysm, with the exception that only items in your posession can be used (not every item you ever collected).
+Module to allow changing your equipped item appearances with any items you have ever obtained during your characters lifetime. This tries to simulate the transmog feature introduced in Cataclysm.
 
 The transmog npc will be located in Stormwind Mage Tower and in Orgrimmar Valley of Spirits.
 
@@ -11,7 +11,8 @@ Classic, TBC and WoTLK
 2. Enable the `BUILD_MODULE_TRANSMOG` flag in cmake and run cmake. The module should be installed in `src/modules/transmog`
 3. Copy the configuration file from `src/modules/transmog/src/transmog.conf.dist.in` and place it where your mangosd executable is. Also rename it to `transmog.conf`.
 4. Remember to edit the config file and modify the options you want to use.
-5. Lastly you will have to install the database changes located in the `src/modules/transmog/sql/install` folder, each folder inside represents where you should execute the queries. E.g. The queries inside of `src/modules/transmog/sql/install/world` will need to be executed in the world/mangosd database, the ones in `src/modules/transmog/sql/install/characters` in the characters database, etc...
+5. You will also have to install the database changes located in the `src/modules/transmog/sql/install` folder, each folder inside represents where you should execute the queries. E.g. The queries inside of `src/modules/transmog/sql/install/world` will need to be executed in the world/mangosd database, the ones in `src/modules/transmog/sql/install/characters` in the characters database, etc...
+6. Lastly in order to use the system you will need to install the addon to your client. Pick one of the addon versions based on your client version from the `addons` folder.
 
 # How to uninstall
 To remove transmog from your server you have multiple options, the first and easiest is to disable it from the hardcore.conf file. The second option is to completely remove it from the server and db:
