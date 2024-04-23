@@ -1,0 +1,7 @@
+## Interface: 20400
+## Title: Transmog
+## Notes: Transmog UI for CMangos Wow
+## SavedVariablesPerCharacter: transmogOutfits
+Transmog.lua
+Transmog.xml
+TransmogSets.lua

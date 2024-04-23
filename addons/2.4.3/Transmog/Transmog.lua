@@ -218,7 +218,7 @@ function Transmog:slotIdToServerSlot(slotId)
 
     local itemType = 99
     if GetInventoryItemLink('player', slotId) then
-        local itemName, _, _, _, _, _, _, it = GetItemInfo(self:IDFromLink(GetInventoryItemLink('player', slotId)))
+        local itemName, _, _, _, _, _, _, _, it = GetItemInfo(self:IDFromLink(GetInventoryItemLink('player', slotId)))
         itemType = it
     end
 
@@ -348,7 +348,7 @@ Transmog:SetScript("OnEvent", function()
                 local from = arg4
                 if string.find(message, 'INSShowTransmogs', 1, true) then
                     SendAddonMessage("TW_CHAT_MSG_WHISPER<" .. from .. ">", "INSTransmogs:start", "GUILD")
-                    for InventorySlotId, itemID in Transmog.transmogStatusFromServer do
+                    for InventorySlotId, itemID in pairs(Transmog.transmogStatusFromServer) do
                         if itemID ~= 0 then
 
                             local TransmogItemName = GetItemInfo(itemID)
@@ -371,8 +371,8 @@ Transmog:SetScript("OnEvent", function()
 			if TransmogFrame_Find(arg1, Transmog.prefix, 1, true) then
 
 				twfdebug("CHAT_MSG_ADDON " .. arg2)
-				
 				local message = arg2
+
 				if TransmogFrame_Find(message, "AvailableTransmogs", 1, true) then
 
 					--AvailableTransmogs:slot:itemClass+itemSubClass:amount:start
@@ -399,7 +399,7 @@ Transmog:SetScript("OnEvent", function()
 					elseif TransmogFrame_Find(ex[5], "end", 1, true) then
 						Transmog:prepareAvailableTransmogs(slot, itemClass)
 					else
-						for i, itemID in ex do
+						for i, itemID in ipairs(ex) do
 							if i > 4 then
 								itemID = TransmogFrame_ToNumber(itemID)
 								if itemID ~= 0 then
@@ -433,14 +433,14 @@ Transmog:SetScript("OnEvent", function()
 						Transmog.transmogStatusFromServer = {}
 						Transmog.transmogStatusToServer = {}
 
-						for _, InventorySlotId in Transmog.inventorySlots do
+						for _, InventorySlotId in pairs(Transmog.inventorySlots) do
 							Transmog.transmogStatusFromServer[InventorySlotId] = 0
 							Transmog.transmogStatusToServer[InventorySlotId] = 0
 						end
 						
 						local amount = TransmogFrame_ToNumber(dataEx[2])
 						if amount > 0 then
-							for i, d in dataEx do
+							for i, d in ipairs(dataEx) do
 								if i > 2 then
 									local slotStatus = TransmogFrame_Explode(d, ",")
 									local InventorySlotId = TransmogFrame_ToNumber(slotStatus[1])+1
@@ -497,7 +497,7 @@ Transmog:SetScript("OnEvent", function()
 						local success = TransmogFrame_ToNumber(dataEx[2])
 						local data = {}
 						if dataEx[3] then
-							for i, str in dataEx do
+							for i, str in ipairs(dataEx) do
 								if i > 2 then
 									local ex = TransmogFrame_Explode(str, ",")
 									if ex[1] and ex[2] then
@@ -520,7 +520,7 @@ Transmog:SetScript("OnEvent", function()
 end)
 
 function Transmog:EquippedItemsChanged()
-    for _, InventorySlotId in self.inventorySlots do
+    for _, InventorySlotId in pairs(self.inventorySlots) do
         if GetInventoryItemLink('player', InventorySlotId) then
             local _, _, eqItemLink = TransmogFrame_Find(GetInventoryItemLink('player', InventorySlotId), "(item:%d+:%d+:%d+:%d+)");
             if self.equippedItems[InventorySlotId] ~= self:IDFromLink(eqItemLink) then
@@ -532,7 +532,7 @@ function Transmog:EquippedItemsChanged()
 end
 
 function Transmog:CacheEquippedGear()
-    for _, InventorySlotId in self.inventorySlots do
+    for _, InventorySlotId in pairs(self.inventorySlots) do
         if GetInventoryItemLink('player', InventorySlotId) then
             self:cacheItem(GetInventoryItemLink('player', InventorySlotId))
         end
@@ -540,7 +540,7 @@ function Transmog:CacheEquippedGear()
 end
 
 function Transmog:CacheOutfitsItems()
-    for _, data in transmogOutfits do
+    for _, data in pairs(transmogOutfits) do
         for _, itemId in data do
             self:cacheItem(itemId)
         end
@@ -548,8 +548,8 @@ function Transmog:CacheOutfitsItems()
 end
 
 function Transmog:CacheSetItems()
-    for _, setData in next, self.availableSets do
-        for _, itemId in next, setData.items do
+    for _, setData in pairs(self.availableSets) do
+        for _, itemId in pairs(setData.items) do
             self:cacheItem(itemId)
         end
     end
@@ -636,7 +636,6 @@ function Transmog:LoadOnce()
 	twfdebug("LoadOnce")
     self:aSend("GetTransmogStatus")
 	self:aSend("GetAvailableTransmogs")
-    --self:aSend("GetSetsStatus:")
 end
 
 function TransmogFrame_OnShow()
@@ -646,7 +645,6 @@ function TransmogFrame_OnShow()
     Transmog_switchTab('items')
     SetPortraitTexture(TransmogFramePortrait, "target");
 
-    --Transmog:getFashionCoins()
     Transmog:Reset()
 	
 	Transmog:hideItems(false)
@@ -787,10 +785,9 @@ function Transmog:prepareAvailableTransmogs(slot, itemClass)
 
     self.availableTransmogItems[slot][itemClass] = {}
 
-    for i, itemID in self.transmogDataFromServer[slot][itemClass] do
+    for i, itemID in ipairs(self.transmogDataFromServer[slot][itemClass]) do
         itemID = TransmogFrame_ToNumber(itemID)
-        local name, link, quality, _, xt1, xt2, _, equip_slot, xtex = GetItemInfo(itemID)
-		--local itemName, a1, a2, a3, itemClass, itemSubclass, a6, invType = GetItemInfo(eqItemLink)
+        local name, link, quality, level, min_level, class, subclass, _, inv_type, tex = GetItemInfo(itemID)
 		
 		-- This will fail if the item is not currently equipped
 		local eqItemLink = nil
@@ -820,10 +817,10 @@ function Transmog:prepareAvailableTransmogs(slot, itemClass)
                 ['name'] = name,
                 ['link'] = link,
                 ['quality'] = quality,
-                ['t1'] = xt1,
-                ['t2'] = xt2,
-                ['equip_slot'] = equip_slot,
-                ['tex'] = xtex,
+                ['t1'] = class,
+                ['t2'] = subclass,
+                ['equip_slot'] = inv_type,
+                ['tex'] = tex,
                 ['itemLink'] = eqItemLink
             })
         end
@@ -850,7 +847,7 @@ function Transmog:renderAvailableTransmogs(slot, itemClass)
     local col = 0
     local itemIndex = 1
 
-    for _, item in next, self.availableTransmogItems[slot][itemClass] do
+    for _, item in ipairs(self.availableTransmogItems[slot][itemClass]) do
 
         if index >= (self.currentPage - 1) * self.ipp and index < self.currentPage * self.ipp then
 
@@ -1142,7 +1139,7 @@ function Transmog:transmogStatus()
 	twfdebug("TransmogStatus")
 	
     -- cache data
-    for InventorySlotId, itemID in self.transmogStatusFromServer do
+    for InventorySlotId, itemID in pairs(self.transmogStatusFromServer) do
 		if itemID ~= 0 then
 
 			local TransmogItemName = GetItemInfo(itemID)
@@ -1162,7 +1159,7 @@ function Transmog:transmogStatus()
     end
 
     -- add paperdoll textures
-    for slotName, InventorySlotId in self.inventorySlots do
+    for slotName, InventorySlotId in pairs(self.inventorySlots) do
         local frame = getglobal(slotName)
         if frame then
 
@@ -1186,12 +1183,12 @@ function Transmog:transmogStatus()
     end
 
     -- add item textures
-    for slotName, InventorySlotId in self.inventorySlots do
+    for slotName, InventorySlotId in pairs(self.inventorySlots) do
         self.equippedItems[InventorySlotId] = 0
         if GetInventoryItemLink('player', InventorySlotId) then
 
             local _, _, eqItemLink = TransmogFrame_Find(GetInventoryItemLink('player', InventorySlotId), "(item:%d+:%d+:%d+:%d+)");
-            local itemName, _, _, _, _, _, _, _, tex = GetItemInfo(eqItemLink)
+            local itemName, _, _, _, _, _, _, _, _, tex = GetItemInfo(eqItemLink)
 
             self.equippedItems[InventorySlotId] = self:IDFromLink(eqItemLink)
 
@@ -1214,7 +1211,7 @@ function Transmog:transmogStatus()
                     getglobal(frame:GetName() .. 'BorderHi'):Show()
                     AddButtonOnEnterTooltipFashion(frame, eqItemLink, self.equippedTransmogs[itemName], true)
 
-                    local _, _, _, _, _, _, _, _, TransmogTex = GetItemInfo(self.transmogStatusFromServer[InventorySlotId])
+                    local _, _, _, _, _, _, _, _, _, TransmogTex = GetItemInfo(self.transmogStatusFromServer[InventorySlotId])
 
                     getglobal(frame:GetName() .. 'ItemIcon'):SetTexture(TransmogTex)
                     getglobal(frame:GetName() .. 'Revert'):Show()
@@ -1235,7 +1232,7 @@ function Apply_OnClick()
     TransmogFrameApplyButton:Disable()
 
 	local slots = ""
-    for InventorySlotId, itemID in Transmog.transmogStatusToServer do
+    for InventorySlotId, itemID in pairs(Transmog.transmogStatusToServer) do
         if Transmog.transmogStatusFromServer[InventorySlotId] ~= itemID then
 			slots = slots .. InventorySlotId-1 .. ":" .. Transmog.transmogStatusToServer[InventorySlotId] .. ","
         end
@@ -1273,7 +1270,7 @@ end
 function Transmog:addTransmogAnim(id, reset)
 	twfdebug("addTransmogAnim id: "..id)
 
-    for slotName, InventorySlotId in self.inventorySlots do
+    for slotName, InventorySlotId in pairs(self.inventorySlots) do
         if id == InventorySlotId then
             local frame = getglobal(slotName)
             if frame then
@@ -1364,16 +1361,16 @@ function Transmog_Try(itemId, slotName, newReset)
         --Transmog:getFashionCoins()
         Transmog:transmogStatus()
 
-        for InventorySlotId, data in Transmog.transmogStatusFromServer do
+        for InventorySlotId, data in pairs(Transmog.transmogStatusFromServer) do
             Transmog.transmogStatusToServer[InventorySlotId] = data
         end
 
         local setIndex = itemId
-        for _, setItemId in next, Transmog.availableSets[setIndex]['items'] do
+        for _, setItemId in ipairs(Transmog.availableSets[setIndex]['items']) do
 
             local found = false
-            for _, data in next, Transmog.currentTransmogsData do
-                for _, d in next, data do
+            for _, data in ipairs(Transmog.currentTransmogsData) do
+                for _, d in ipairs(data) do
                     if d['id'] == setItemId then
                         found = true
                     end
@@ -1437,7 +1434,7 @@ function Transmog_Try(itemId, slotName, newReset)
 
         TransmogFramePlayerModel:TryOn(itemId);
 
-        local _, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
+        local _, _, _, _, _, _, _, _, _, tex = GetItemInfo(itemId)
 
         getglobal(slotName .. "ItemIcon"):SetTexture(tex)
 
@@ -1462,7 +1459,7 @@ function Transmog_Try(itemId, slotName, newReset)
         Transmog.transmogStatusToServer[Transmog.currentTransmogSlot] = itemId
     end
 
-    for itemIndex, data in Transmog.ItemButtons do
+    for itemIndex, data in ipairs(Transmog.ItemButtons) do
         getglobal('TransmogLook' .. itemIndex .. 'Button'):SetNormalTexture('Interface\\AddOns\\Transmog\\TransmogFrame\\item_bg_normal')
         if data.id == itemId then
             getglobal('TransmogLook' .. itemIndex .. 'Button'):SetNormalTexture('Interface\\AddOns\\Transmog\\TransmogFrame\\item_bg_selected')
@@ -1481,7 +1478,7 @@ function Transmog_Try(itemId, slotName, newReset)
 
     TransmogFramePlayerModel:TryOn(itemId);
 
-    local itemName, itemLink, itemRarity, _, t1, t2, _, itemSlot, tex = GetItemInfo(itemId)
+    local name, linkString, quality, level, min_level, class, subclass, stack, inv_type, tex, price = GetItemInfo(itemId)
 
     getglobal(Transmog.currentTransmogSlotName .. "ItemIcon"):SetTexture(tex)
 
@@ -1517,7 +1514,7 @@ function Transmog:showPagination()
 end
 
 function Transmog:hideItems(hideButton)
-    for index, button in self.ItemButtons do
+    for index, button in ipairs(self.ItemButtons) do
 		if hideButton then
 			button:Hide()
 		else
@@ -1527,7 +1524,7 @@ function Transmog:hideItems(hideButton)
 end
 
 function Transmog:hideItemBorders()
-    for index in next, self.ItemButtons do
+    for index, _ in ipairs(self.ItemButtons) do
         getglobal('TransmogLook' .. index .. 'Button'):SetNormalTexture('Interface\\AddOns\\Transmog\\TransmogFrame\\item_bg_normal')
 	end
 end
@@ -1540,7 +1537,7 @@ function Transmog:calculateCost(to)
     local transmogs = 0
     local resets = 0
 
-    for InventorySlotId, data in self.transmogStatusFromServer do
+    for InventorySlotId, data in pairs(self.transmogStatusFromServer) do
         if data ~= self.transmogStatusToServer[InventorySlotId] then
             if self.transmogStatusToServer[InventorySlotId] ~= 0 then
                 transmogs = transmogs + 1
@@ -1626,7 +1623,7 @@ function Transmog:updateCost(cost, tokenID, canPurchase)
 			TransmogFrameCurrencyIcon:SetPushedTexture("Interface\\Icons\\inv_misc_coin_01")
 			AddButtonOnEnterTextTooltip(TransmogFrameCurrencyIcon, "Money")
 		else
-			local name, linkString, _, _, _, _, _, _, tex = GetItemInfo(tokenID)
+			local name, linkString, _, _, _, _, _, _, _, tex = GetItemInfo(tokenID)
 			if not name then
 				return
 			end
@@ -1672,7 +1669,7 @@ function Transmog:hidePlayerItemsBorders()
 end
 
 function Transmog:LockPlayerItems()
-    for slot in Transmog.inventorySlots do
+    for slot, _ in pairs(Transmog.inventorySlots) do
         getglobal(slot):Disable()
         SetDesaturation(getglobal(slot .. 'ItemIcon'), 1);
     end
@@ -1688,7 +1685,7 @@ function Transmog:tableSize(t)
         return 0
     end
     local size = 0
-    for i, d in t do
+    for _ in pairs(t) do
         size = size + 1
     end
     return size
@@ -1755,7 +1752,7 @@ function Transmog:ItemSubclassStrToNum(itemSubclassStr)
 			itemSubclass = 1
 		elseif itemSubclassStr == "Leather" or itemSubclassStr == "Cuero" then
 			itemSubclass = 2
-		elseif itemSubclassStr == "Mail" or itemSubclassStr == "Mallas" then
+		elseif itemSubclassStr == "Mail" or itemSubclassStr == "Malla" then
 			itemSubclass = 3
 		elseif itemSubclassStr == "Plate" or itemSubclassStr == "Placas" then
 			itemSubclass = 4
@@ -1813,7 +1810,7 @@ function selectTransmogSlot(InventorySlotId, slotName)
     end
 
     local _, _, eqItemLink = TransmogFrame_Find(GetInventoryItemLink('player', Transmog.currentTransmogSlot), "(item:%d+:%d+:%d+:%d+)");
-    local itemName, a1, a2, a3, itemClass, itemSubclass, a6, invType = GetItemInfo(eqItemLink)
+    local itemName, _, _, _, _, itemClass, itemSubclass, _, invType = GetItemInfo(eqItemLink)
 
     local eqItemId = Transmog:IDFromLink(eqItemLink)
 
@@ -1968,10 +1965,10 @@ function Transmog_switchTab(to)
 
             -- calculate completed sets
             local numCollectedItems = 0
-            for _, itemID in set.items do
+            for _, itemID in ipairs(set.items) do
                 if GetItemInfo(itemID) then
-                    for _, data in next, Transmog.currentTransmogsData do
-                        for _, d in next, data do
+                    for _, data in ipairs(Transmog.currentTransmogsData) do
+                        for _, d in ipairs(data) do
                             if d['id'] == itemID then
                                 numCollectedItems = numCollectedItems + 1
                             end
@@ -2003,12 +2000,12 @@ function Transmog_switchTab(to)
                 local setItemsText = ''
                 local founds = 0
                 for _, itemID in set.items do
-                    local setItemName, link, quality, _, xt1, xt2, _, equip_slot, xtex = GetItemInfo(itemID)
+                    local setItemName, _, _, _, _, _, _, _, equip_slot, xtex = GetItemInfo(itemID)
 
                     if setItemName then
 
                         local found = false
-                        for _, data in next, Transmog.currentTransmogsData do
+                        for _, data in ipairs(Transmog.currentTransmogsData) do
                             for _, d in next, data do
                                 if d['id'] == itemID then
                                     found = true
@@ -2135,7 +2132,7 @@ EquipTransmogTooltip:SetScript("OnShow", function()
             return
         end
 
-        for _, frame in next, characterPaperDollFrames do
+        for _, frame in ipairs(characterPaperDollFrames) do
             if GameTooltip:IsOwned(frame) == 1 then
 
                 local itemName = GetItemInfo(itemLink)
@@ -2199,7 +2196,7 @@ Transmog.applyTimer:SetScript("OnUpdate", function()
         end
 
         local allDone = true
-        for _, action in Transmog.applyTimer.actions do
+        for _, action in ipairs(Transmog.applyTimer.actions) do
             if not action.sent then
                 allDone = false
             end
@@ -2217,7 +2214,7 @@ Transmog.itemAnimation:Hide()
 
 Transmog.itemAnimation:SetScript("OnShow", function()
     this.startTime = GetTime()
-    for _, frame in Transmog.itemAnimationFrames do
+    for _, frame in ipairs(Transmog.itemAnimationFrames) do
         frame.autocast:Hide()
         if frame.reset then
             frame.borderFull:Show()
@@ -2251,7 +2248,7 @@ Transmog.itemAnimation:SetScript("OnUpdate", function()
     local st = (this.startTime + plus) * 1000
     if gt >= st then
 
-        for index, frame in Transmog.itemAnimationFrames do
+        for index, frame in ipairs(Transmog.itemAnimationFrames) do
             if frame.reset then
                 frame.borderFull:SetAlpha(frame.borderFull:GetAlpha() - 0.05)
                 if frame.borderHi:GetWidth() > 32 then
@@ -2339,7 +2336,7 @@ Transmog.delayAddWonItem:SetScript("OnUpdate", function()
     if gt >= st then
 
         local atLeastOne = false
-        for id, data in next, Transmog.delayAddWonItem.data do
+        for id, data in pairs(Transmog.delayAddWonItem.data) do
             if Transmog.delayAddWonItem.data[id] then
                 atLeastOne = true
                 Transmog:addWonItem(id)
@@ -2374,9 +2371,10 @@ Transmog.gearChangedDelay:SetScript("OnUpdate", function()
 end)
 
 function Transmog:addWonItem(itemID)
-    local name, linkString, quality, _, _, _, _, _, tex = GetItemInfo(itemID)
+    local name, linkString, quality, level, min_level, class, subclass, stack, inv_type, tex, price = GetItemInfo(itemID)
 	
 	twfdebug("addWonItem itemID: " .. itemID)
+
 	if not name or not quality then
 		twfdebug("delayed")
 		self.delayAddWonItem.data[itemID] = true
@@ -2458,7 +2456,7 @@ Transmog.newTransmogAlert:SetScript("OnUpdate", function()
 
             this.startTime = GetTime()
 
-            for i, d in next, Transmog.newTransmogAlert.wonItems do
+            for i, d in ipairs(Transmog.newTransmogAlert.wonItems) do
 
                 if Transmog.newTransmogAlert.wonItems[i].active then
 
@@ -2532,7 +2530,7 @@ end
 
 function OutfitsDropDown_Initialize()
 
-    for name, data in transmogOutfits do
+    for name, data in pairs(transmogOutfits) do
         local info = {}
         info.text = name
         info.value = 1
@@ -2541,12 +2539,12 @@ function OutfitsDropDown_Initialize()
         info.func = Transmog_LoadOutfit
         info.tooltipTitle = name
         local descText = ''
-        for slot, itemID in data do
+        for slot, itemID in pairs(data) do
             if itemID == 0 then
                 --descText = descText .. FONT_COLOR_CODE_CLOSE ..  slot .. ": None \n"
             else
 				Transmog:cacheItem(itemID)
-                local n, link, quality, _, _, _, _, equip_slot = GetItemInfo(itemID)
+                local n, _, quality, _, _, _, _, _, equip_slot = GetItemInfo(itemID)
 				
 				--dirty fix
                 if quality == nil then quality = 0 end
@@ -2589,7 +2587,7 @@ function Transmog_LoadOutfit(outfit)
 
     Transmog:hideItemBorders()
 
-    for slot, itemID in transmogOutfits[outfit] do
+    for slot, itemID in pairs(transmogOutfits[outfit]) do
 
         local eq_slot, tex
         local hasItemEquipped = false
@@ -2602,11 +2600,11 @@ function Transmog_LoadOutfit(outfit)
 
             if itemID == 0 then
                 local _, _, eqItemLink = TransmogFrame_Find(GetInventoryItemLink('player', slot), "(item:%d+:%d+:%d+:%d+)");
-                local _, _, _, _, _, _, _, equip_slot, outfitTex = GetItemInfo(eqItemLink)
+                local _, _, _, _, _, _, _, _, equip_slot, outfitTex = GetItemInfo(eqItemLink)
                 eq_slot = equip_slot
                 tex = outfitTex
             else
-                local _, _, _, _, _, _, _, equip_slot, outfitTex = GetItemInfo(itemID)
+                local _, _, _, _, _, _, _, _, equip_slot, outfitTex = GetItemInfo(itemID)
                 eq_slot = equip_slot
                 tex = outfitTex
             end
@@ -2645,12 +2643,12 @@ end
 
 function Transmog_SaveOutfit()
 	transmogOutfits[Transmog.currentOutfit] = {}
-    for InventorySlotId, itemID in Transmog.transmogStatusFromServer do
+    for InventorySlotId, itemID in pairs(Transmog.transmogStatusFromServer) do
         if itemID ~= 0 then
             transmogOutfits[Transmog.currentOutfit][InventorySlotId] = itemID
         end
     end
-    for InventorySlotId, itemID in Transmog.transmogStatusToServer do
+    for InventorySlotId, itemID in pairs(Transmog.transmogStatusToServer) do
         if itemID ~= 0 then
             transmogOutfits[Transmog.currentOutfit][InventorySlotId] = itemID
         end
