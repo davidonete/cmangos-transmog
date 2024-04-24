@@ -151,7 +151,7 @@ namespace cmangos_module
 	    }
     }
 
-    void TransmogModule::OnStoreItem(Player* player, Item* item)
+    void TransmogModule::OnEquipItem(Player* player, Item* item)
     {
         if (GetConfig()->enabled)
         {
