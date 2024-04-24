@@ -833,14 +833,18 @@ function Transmog:renderAvailableTransmogs(slot, itemClass)
 
 	twfdebug("renderAvailableTransmogs slot: " .. slot .. " itemClass: " .. itemClass)
 
-    self:setProgressBar(self:tableSize(self.transmogDataFromServer[slot][itemClass]), self.numTransmogs[slot][itemClass])
-    if self:tableSize(self.transmogDataFromServer[slot][itemClass]) == 0 then
-        TransmogFrameNoTransmogs:Show()
-    end
+	if not self.transmogDataFromServer[slot] then
+		return
+	end
 
     -- hide all item buttons
     self:hideItems(true)
     self:hideItemBorders()
+	
+	self:setProgressBar(self:tableSize(self.transmogDataFromServer[slot][itemClass]), self.numTransmogs[slot][itemClass])
+    if self:tableSize(self.transmogDataFromServer[slot][itemClass]) == 0 then
+        TransmogFrameNoTransmogs:Show()
+    end
 
     local index = 0
     local row = 0
@@ -1758,6 +1762,8 @@ function Transmog:ItemSubclassStrToNum(itemSubclassStr)
 			itemSubclass = 4
 		elseif itemSubclassStr == "Shields" or itemSubclassStr == "Escudos" then
 			itemSubclass = 6
+		elseif itemSubclassStr == "Miscellaneous" or itemSubclassStr == "Misceláneo" then
+			itemSubclass = 0
 		end
 	end
 	
