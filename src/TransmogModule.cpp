@@ -693,8 +693,6 @@ namespace cmangos_module
                 };
 
                 helper::ForEachEquippedItem(player, CheckTransmogItem);
-                helper::ForEachInventoryItem(player, CheckTransmogItem);
-                helper::ForEachBankItem(player, CheckTransmogItem);
             }
         }
     }
