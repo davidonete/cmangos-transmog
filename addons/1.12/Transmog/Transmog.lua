@@ -59,6 +59,7 @@ Transmog.availableTransmogItems = {}
 Transmog.ItemButtons = {}
 Transmog.currentTransmogSlotName = nil
 Transmog.currentTransmogSlot = nil
+Transmog.currentTransmogItemClass = nil
 Transmog.page = -1
 Transmog.currentPage = 1
 Transmog.totalPages = 1
@@ -836,15 +837,15 @@ function Transmog:renderAvailableTransmogs(slot, itemClass)
 
 	twfdebug("renderAvailableTransmogs slot: " .. slot .. " itemClass: " .. itemClass)
 
-	if not self.transmogDataFromServer[slot] then
-		return
-	end
-
     -- hide all item buttons
     self:hideItems(true)
     self:hideItemBorders()
 	
-	self:setProgressBar(self:tableSize(self.transmogDataFromServer[slot][itemClass]), self.numTransmogs[slot][itemClass])
+	if not self.transmogDataFromServer[slot] then
+		return
+	end
+
+    self:setProgressBar(self:tableSize(self.transmogDataFromServer[slot][itemClass]), self.numTransmogs[slot][itemClass])
     if self:tableSize(self.transmogDataFromServer[slot][itemClass]) == 0 then
         TransmogFrameNoTransmogs:Show()
     end
@@ -1136,9 +1137,7 @@ function Transmog:renderAvailableTransmogs(slot, itemClass)
         self:hidePagination()
     end
 
-    if self.currentTransmogSlotName then
-        getglobal(self.currentTransmogSlotName .. 'BorderSelected'):Show()
-    end
+
 
 end
 
@@ -1794,6 +1793,7 @@ function selectTransmogSlot(InventorySlotId, slotName)
         TransmogFrameCollected:Hide()
         Transmog.currentTransmogSlotName = nil
         Transmog.currentTransmogSlot = nil
+		Transmog.currentTransmogItemClass = nil
         return true
     end
 
@@ -1831,8 +1831,10 @@ function selectTransmogSlot(InventorySlotId, slotName)
 
     Transmog:hideItems(false)
     Transmog:hidePlayerItemsBorders()
+	
+	Transmog.currentTransmogItemClass = Transmog:ItemClassStrToNum(itemClass) + Transmog:ItemSubclassStrToNum(itemSubclass)
 
-    Transmog:renderAvailableTransmogs(InventorySlotId, Transmog:ItemClassStrToNum(itemClass) + Transmog:ItemSubclassStrToNum(itemSubclass))
+    Transmog:renderAvailableTransmogs(Transmog.currentTransmogSlot, Transmog.currentTransmogItemClass)
 end
 
 function TransmogModel_OnLoad()
@@ -1915,7 +1917,7 @@ end
 function Transmog_ChangePage(dir)
     Transmog.currentPage = Transmog.currentPage + dir
     if Transmog.tab == 'items' then
-        Transmog:renderAvailableTransmogs(Transmog.currentTransmogSlot)
+        Transmog:renderAvailableTransmogs(Transmog.currentTransmogSlot, Transmog.currentTransmogItemClass)
     else
         Transmog_switchTab(Transmog.tab)
     end

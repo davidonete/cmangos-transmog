@@ -59,6 +59,7 @@ Transmog.availableTransmogItems = {}
 Transmog.ItemButtons = {}
 Transmog.currentTransmogSlotName = nil
 Transmog.currentTransmogSlot = nil
+Transmog.currentTransmogItemClass = nil
 Transmog.page = -1
 Transmog.currentPage = 1
 Transmog.totalPages = 1
@@ -1791,6 +1792,7 @@ function selectTransmogSlot(InventorySlotId, slotName)
         TransmogFrameCollected:Hide()
         Transmog.currentTransmogSlotName = nil
         Transmog.currentTransmogSlot = nil
+		Transmog.currentTransmogItemClass = nil
         return true
     end
 
@@ -1828,8 +1830,10 @@ function selectTransmogSlot(InventorySlotId, slotName)
 
     Transmog:hideItems(false)
     Transmog:hidePlayerItemsBorders()
+	
+	Transmog.currentTransmogItemClass = Transmog:ItemClassStrToNum(itemClass) + Transmog:ItemSubclassStrToNum(itemSubclass)
 
-    Transmog:renderAvailableTransmogs(InventorySlotId, Transmog:ItemClassStrToNum(itemClass) + Transmog:ItemSubclassStrToNum(itemSubclass))
+    Transmog:renderAvailableTransmogs(Transmog.currentTransmogSlot, Transmog.currentTransmogItemClass)
 end
 
 function TransmogModel_OnLoad()
